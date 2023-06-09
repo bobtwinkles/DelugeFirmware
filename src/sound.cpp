@@ -3122,7 +3122,7 @@ bool Sound::readParamTagFromFile(char const* tagName, ParamManagerForTimeline* p
 	}
 	else if (!strcmp(tagName, "lpfFrequency")) {
 		patchedParams->readParam(patchedParamsSummary, PARAM_LOCAL_LPF_FREQ, readAutomationUpToPos);
-		storageManager.exitTag("lpfFrequency");
+storageManager.exitTag("lpfFrequency");
 	}
 	else if (!strcmp(tagName, "lpfResonance")) {
 		patchedParams->readParam(patchedParamsSummary, PARAM_LOCAL_LPF_RESONANCE, readAutomationUpToPos);
