@@ -1,0 +1,101 @@
+.direct-pin {
+  fill: red;
+}
+
+text {
+  font: 10px Ubuntu Mono;
+  dominant-baseline: middle;
+}
+
+.output-flag {
+  stroke: black;
+  stroke-width: 2px;
+  fill: #a1e57e;
+}
+
+.input-flag {
+  stroke: black;
+  stroke-width: 2px;
+  fill: #a1e57e;
+}
+
+.indirect-input-flag {
+  stroke: black;
+  stroke-width: 2px;
+  fill: #e5de7eff;
+}
+
+.indirect-output-flag {
+  stroke: black;
+  stroke-width: 2px;
+  fill: #e5de7eff;
+}
+
+.bus-flag {
+  stroke: black;
+  stroke-width: 2px;
+  fill: #7ee5dfff;
+}
+
+.module rect {
+  stroke: black;
+  stroke-width: 2px;
+  fill: white;
+}
+
+.module path {
+  stroke: black;
+  stroke-width: 2px;
+}
+
+.cpu {
+  stroke: black;
+  stroke-width: 2px;
+  fill: white;
+}
+
+.port-base {
+  stroke: black;
+  stroke-width: 2px;
+  fill: white;
+}
+
+.port-label {
+  stroke: black;
+  stroke-width: 2px;
+  fill: white;
+}
+
+.cpu-pin .cpu-package-pin {
+  text-anchor: end;
+}
+
+.connection {
+  stroke: black;
+  stroke-width: 2px;
+  fill: none;
+}
+
+.pin-connection-group .connection {
+  stroke-width: 5px;
+  stroke: transparent;
+  fill: none;
+}
+
+.pin-connection-group:hover * {
+  stroke: red;
+  stroke-width: 3px;
+}
+
+.pin-connection-group .highlight {
+  fill: transparent;
+}
+
+.pin-connection-group .cpu-pin * {
+  fill: transparent;
+  stroke: none;
+}
+
+.pin-connection-group:hover .cpu-pin * {
+  stroke: red;
+}
