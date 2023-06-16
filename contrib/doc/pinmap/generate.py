@@ -137,6 +137,24 @@ class CpuPin:
         g.attrib['transform'] = f'translate({left}, {top})'
         g.attrib['class'] = 'cpu-pin'
 
+        package_pin_width = 22
+        backg_package_pin = ET.SubElement(g, 'rect')
+        backg_package_pin.attrib['width']  = str(package_pin_width)
+        backg_package_pin.attrib['height'] = str(UNIT_HEIGHT)
+        backg_package_pin.attrib['clip-path'] = 'url(#cpu-pin-clip)'
+        backg_package_pin.attrib['class'] = 'package-pin-backg'
+        if facing_left:
+            backg_package_pin.attrib['x'] = str(CPU_PIN_WIDTH - package_pin_width)
+
+        port_pin_width = CPU_PIN_WIDTH - package_pin_width
+        backg_port_pin = ET.SubElement(g, 'rect')
+        backg_port_pin.attrib['width']  = str(port_pin_width)
+        backg_port_pin.attrib['height'] = str(UNIT_HEIGHT)
+        backg_port_pin.attrib['clip-path'] = 'url(#cpu-pin-clip)'
+        backg_port_pin.attrib['class'] = 'port-pin-backg'
+        if not facing_left:
+            backg_port_pin.attrib['x'] = str(CPU_PIN_WIDTH - port_pin_width)
+
         backg = ET.SubElement(g, 'rect')
         backg.attrib['rx'] = '5'
         backg.attrib['ry'] = '5'
@@ -146,14 +164,22 @@ class CpuPin:
 
         label = ET.SubElement(g, 'text')
         label.text = f'Pin {self.port_pin}'
-        label.attrib['x'] = '3'
         label.attrib['y'] = str(HALF_HEIGHT)
+        if facing_left:
+            label.attrib['x'] = '3'
+        else:
+            label.attrib['text-anchor'] = 'start'
+            label.attrib['x'] = str(package_pin_width + 2)
 
         label = ET.SubElement(g, 'text')
         label.text = str(self.package_pin)
-        label.attrib['x'] = str(49)
         label.attrib['y'] = str(HALF_HEIGHT)
         label.attrib['class'] = 'cpu-package-pin'
+        if facing_left:
+            label.attrib['x'] = str(CPU_PIN_WIDTH - 3)
+            label.attrib['text-anchor'] = 'end'
+        else:
+            label.attrib['x'] = str(3)
 
         self.tip_y = top + HALF_HEIGHT
         if facing_left:
@@ -689,7 +715,7 @@ PADDING = 3
 LINE_WEIGHT = 2
 SPACING = UNIT_HEIGHT + LINE_WEIGHT
 MODULE_WIDTH = 120
-CPU_PIN_WIDTH = 52
+CPU_PIN_WIDTH = 58
 CPU_PORT_WIDTH = 80
 CPU_WIDTH = 400
 CPU_LEFT = 400
@@ -814,6 +840,13 @@ def main():
     style = ET.SubElement(defs, 'style')
     with open('style.css') as inf:
         style.text = inf.read()
+    cpu_pin_clip = ET.SubElement(defs, 'clipPath')
+    cpu_pin_clip.attrib['id'] = 'cpu-pin-clip'
+    cpu_pin_clip_rect = ET.SubElement(cpu_pin_clip, 'rect')
+    cpu_pin_clip_rect.attrib['width'] = str(CPU_PIN_WIDTH)
+    cpu_pin_clip_rect.attrib['height'] = str(UNIT_HEIGHT)
+    cpu_pin_clip_rect.attrib['rx'] = '5'
+    cpu_pin_clip_rect.attrib['ry'] = '5'
 
     root_group = ET.SubElement(root, 'g')
 
@@ -1083,8 +1116,6 @@ def main():
     wire_group = ET.SubElement(root_group, 'g')
     for wire in wires:
         wire.render(wire_group)
-
-    print(wires_by_cpu_port[1][0][0].path)
 
     hl_group = ET.SubElement(root_group, 'g')
     for wire in wires:
