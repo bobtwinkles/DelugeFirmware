@@ -355,11 +355,11 @@ text {
     </g>
     <g transform="translate(1424, 724)">
      <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="indirect-input-flag" />
-     <text x="3" y="7.0" text-anchor="left">Headphone R</text>
+     <text x="3" y="7.0" text-anchor="left">¼" Output L</text>
     </g>
     <g transform="translate(1424, 740)">
      <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="indirect-input-flag" />
-     <text x="3" y="7.0" text-anchor="left">¼" Output L</text>
+     <text x="3" y="7.0" text-anchor="left">Headphone R</text>
     </g>
     <g transform="translate(1424, 756)">
      <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="indirect-input-flag" />
@@ -371,11 +371,11 @@ text {
     </g>
     <g transform="translate(1424, 788)">
      <path d="M 0,0H 105 V 14 H 0 l -7.0,-7.0 Z" class="indirect-output-flag" />
-     <text x="3" y="7.0" text-anchor="left">Line In R</text>
+     <text x="3" y="7.0" text-anchor="left">Mic In L</text>
     </g>
     <g transform="translate(1424, 804)">
      <path d="M 0,0H 105 V 14 H 0 l -7.0,-7.0 Z" class="indirect-output-flag" />
-     <text x="3" y="7.0" text-anchor="left">Mic In L</text>
+     <text x="3" y="7.0" text-anchor="left">Line In R</text>
     </g>
     <g transform="translate(1424, 820)">
      <path d="M 0,0H 105 V 14 H 0 l -7.0,-7.0 Z" class="indirect-output-flag" />
@@ -388,11 +388,11 @@ text {
    </g>
    <g>
     <g transform="translate(1008, 699)" class="module">
-     <rect x="0" y="0" rx="5" ry="5" width="120" height="139" />
-     <text x="60.0" y="10.0" text-anchor="middle" dominant-baseline="middle">Audio DAC</text>
-     <path d="M 0,20 H 120" />
-     <rect x="10" y="123" rx="5" ry="5" width="110" height="16" />
-     <text x="65.0" y="131.0" text-anchor="middle" dominant-baseline="middle">Cirrus Logic CS4270</text>
+     <rect x="0" y="0" rx="5" ry="5" width="240" height="139" />
+     <text x="120.0" y="10.0" text-anchor="middle" dominant-baseline="middle">Audio DAC</text>
+     <path d="M 0,20 H 240" />
+     <rect x="10" y="123" rx="5" ry="5" width="230" height="16" />
+     <text x="125.0" y="131.0" text-anchor="middle" dominant-baseline="middle">Cirrus Logic CS4270</text>
     </g>
     <g transform="translate(1008, 724)">
      <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="input-flag" />
@@ -404,11 +404,11 @@ text {
     </g>
     <g transform="translate(1008, 756)">
      <path d="M 0,0H 105 V 14 H 0 l -7.0,-7.0 Z" class="output-flag" />
-     <text x="3" y="7.0" text-anchor="left">Audio Out</text>
+     <text x="3" y="7.0" text-anchor="left">Data Out</text>
     </g>
     <g transform="translate(1008, 772)">
      <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="input-flag" />
-     <text x="3" y="7.0" text-anchor="left">Audio In</text>
+     <text x="3" y="7.0" text-anchor="left">Data In</text>
     </g>
     <g transform="translate(1008, 788)">
      <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="input-flag" />
@@ -417,6 +417,22 @@ text {
     <g transform="translate(1008, 804)">
      <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="input-flag" />
      <text x="3" y="7.0" text-anchor="left">MCLK</text>
+    </g>
+    <g transform="translate(1142.0, 724)">
+     <path d="M 0,0 H 105 l 7.0,7.0 l -7.0,7.0 H 0 Z" class="indirect-output-flag" />
+     <text x="3" y="7.0" text-anchor="left">Audio Out L</text>
+    </g>
+    <g transform="translate(1142.0, 740)">
+     <path d="M 0,0 H 105 l 7.0,7.0 l -7.0,7.0 H 0 Z" class="indirect-output-flag" />
+     <text x="3" y="7.0" text-anchor="left">Audio Out R</text>
+    </g>
+    <g transform="translate(1142.0, 756)">
+     <path d="M 107,0 H 0 l -7.0,7.0 l 7.0,7.0 H 107" class="indirect-input-flag" />
+     <text x="3" y="7.0" text-anchor="left">Audio In L</text>
+    </g>
+    <g transform="translate(1142.0, 772)">
+     <path d="M 107,0 H 0 l -7.0,7.0 l 7.0,7.0 H 107" class="indirect-input-flag" />
+     <text x="3" y="7.0" text-anchor="left">Audio In R</text>
     </g>
    </g>
    <g>
@@ -471,11 +487,11 @@ text {
    </g>
    <g>
     <g transform="translate(1008, 1082)" class="module">
-     <rect x="0" y="0" rx="5" ry="5" width="120" height="75" />
-     <text x="60.0" y="10.0" text-anchor="middle" dominant-baseline="middle">LED and Pad Control</text>
-     <path d="M 0,20 H 120" />
-     <rect x="10" y="59" rx="5" ry="5" width="110" height="16" />
-     <text x="65.0" y="67.0" text-anchor="middle" dominant-baseline="middle">PIC24FJ256</text>
+     <rect x="0" y="0" rx="5" ry="5" width="240" height="75" />
+     <text x="120.0" y="10.0" text-anchor="middle" dominant-baseline="middle">LED and Pad Control</text>
+     <path d="M 0,20 H 240" />
+     <rect x="10" y="59" rx="5" ry="5" width="230" height="16" />
+     <text x="125.0" y="67.0" text-anchor="middle" dominant-baseline="middle">PIC24FJ256</text>
     </g>
     <g transform="translate(1008, 1107)">
      <path d="M 0,0H 105 V 14 H 0 l -7.0,-7.0 Z" class="output-flag" />
@@ -484,6 +500,10 @@ text {
     <g transform="translate(1008, 1123)">
      <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="input-flag" />
      <text x="3" y="7.0" text-anchor="left">UART RX</text>
+    </g>
+    <g transform="translate(1142.0, 1107)">
+     <path d="M 0,0 H 105 l 7.0,7.0 l -7.0,7.0 H 0 Z" class="indirect-output-flag" />
+     <text x="3" y="7.0" text-anchor="left">OLED CS</text>
     </g>
    </g>
    <g>
@@ -1067,8 +1087,8 @@ text {
    <path d="M 797,478.0 H 1001.0" class="connection" />
    <path d="M 797,494.0 H 1007.0" class="connection" />
    <path d="M 797,510.0 H 1007.0" class="connection" />
-   <path d="M 797,526.0H 912V 478.0 H 1001.0" class="connection" />
-   <path d="M 797,542.0H 928V 478.0 H 1001.0" class="connection" />
+   <path d="M 797,526.0H 900V 478.0 H 1001.0" class="connection" />
+   <path d="M 797,542.0H 904V 478.0 H 1001.0" class="connection" />
    <path d="M 403,744.0H 253V 366.0 H 176.0" class="connection" />
    <path d="M 403,760.0H 249V 366.0 H 176.0" class="connection" />
    <path d="M 403,776.0H 245V 366.0 H 176.0" class="connection" />
@@ -1112,6 +1132,15 @@ text {
    <path d="M 797,1000.0H 904V 920.0 H 1001.0" class="connection" />
    <path d="M 797,1016.0H 1376V 843.0 H 1417.0" class="connection" />
    <path d="M 797,1032.0H 928V 811.0 H 1007.0" class="connection" />
+   <path d="M 1254.0,1114.0H 1392V 574.0 H 1423.0" class="connection" />
+   <path d="M 1254.0,731.0H 1376V 715.0 H 1423.0" class="connection" />
+   <path d="M 1254.0,731.0H 1376V 731.0 H 1423.0" class="connection" />
+   <path d="M 1254.0,747.0H 1376V 747.0 H 1423.0" class="connection" />
+   <path d="M 1254.0,747.0H 1376V 763.0 H 1423.0" class="connection" />
+   <path d="M 1249.0,763.0H 1360V 779.0 H 1417.0" class="connection" />
+   <path d="M 1249.0,763.0H 1360V 795.0 H 1417.0" class="connection" />
+   <path d="M 1249.0,779.0H 1344V 811.0 H 1417.0" class="connection" />
+   <path d="M 1249.0,779.0H 1344V 827.0 H 1417.0" class="connection" />
   </g>
   <g>
    <g class="pin-connection-group">
@@ -1553,7 +1582,7 @@ text {
     <g transform="translate(1008, 471)">
      <path d="M 105,0 H 0 A 5 5, 0, 0, 0, 0, 14H 105 Z" class="highlight" />
     </g>
-    <path d="M 797,526.0H 912V 478.0 H 1001.0" class="connection" />
+    <path d="M 797,526.0H 900V 478.0 H 1001.0" class="connection" />
    </g>
    <g class="pin-connection-group">
     <g transform="translate(745, 535)" class="cpu-pin highlight">
@@ -1562,7 +1591,7 @@ text {
     <g transform="translate(1008, 471)">
      <path d="M 105,0 H 0 A 5 5, 0, 0, 0, 0, 14H 105 Z" class="highlight" />
     </g>
-    <path d="M 797,542.0H 928V 478.0 H 1001.0" class="connection" />
+    <path d="M 797,542.0H 904V 478.0 H 1001.0" class="connection" />
    </g>
    <g class="pin-connection-group">
     <g transform="translate(403, 737)" class="cpu-pin highlight">
@@ -1950,6 +1979,87 @@ text {
      <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="highlight" />
     </g>
     <path d="M 797,1032.0H 928V 811.0 H 1007.0" class="connection" />
+   </g>
+   <g class="pin-connection-group">
+    <g transform="translate(1142.0, 1107)">
+     <path d="M 0,0 H 105 l 7.0,7.0 l -7.0,7.0 H 0 Z" class="highlight" />
+    </g>
+    <g transform="translate(1424, 567)">
+     <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="highlight" />
+    </g>
+    <path d="M 1254.0,1114.0H 1392V 574.0 H 1423.0" class="connection" />
+   </g>
+   <g class="pin-connection-group">
+    <g transform="translate(1142.0, 724)">
+     <path d="M 0,0 H 105 l 7.0,7.0 l -7.0,7.0 H 0 Z" class="highlight" />
+    </g>
+    <g transform="translate(1424, 708)">
+     <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="highlight" />
+    </g>
+    <path d="M 1254.0,731.0H 1376V 715.0 H 1423.0" class="connection" />
+   </g>
+   <g class="pin-connection-group">
+    <g transform="translate(1142.0, 724)">
+     <path d="M 0,0 H 105 l 7.0,7.0 l -7.0,7.0 H 0 Z" class="highlight" />
+    </g>
+    <g transform="translate(1424, 724)">
+     <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="highlight" />
+    </g>
+    <path d="M 1254.0,731.0H 1376V 731.0 H 1423.0" class="connection" />
+   </g>
+   <g class="pin-connection-group">
+    <g transform="translate(1142.0, 740)">
+     <path d="M 0,0 H 105 l 7.0,7.0 l -7.0,7.0 H 0 Z" class="highlight" />
+    </g>
+    <g transform="translate(1424, 740)">
+     <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="highlight" />
+    </g>
+    <path d="M 1254.0,747.0H 1376V 747.0 H 1423.0" class="connection" />
+   </g>
+   <g class="pin-connection-group">
+    <g transform="translate(1142.0, 740)">
+     <path d="M 0,0 H 105 l 7.0,7.0 l -7.0,7.0 H 0 Z" class="highlight" />
+    </g>
+    <g transform="translate(1424, 756)">
+     <path d="M -1.0,0 H 105 l 7.0,7.0 l -7.0,7.0 H -1.0" class="highlight" />
+    </g>
+    <path d="M 1254.0,747.0H 1376V 763.0 H 1423.0" class="connection" />
+   </g>
+   <g class="pin-connection-group">
+    <g transform="translate(1142.0, 756)">
+     <path d="M 107,0 H 0 l -7.0,7.0 l 7.0,7.0 H 107" class="highlight" />
+    </g>
+    <g transform="translate(1424, 772)">
+     <path d="M 0,0H 105 V 14 H 0 l -7.0,-7.0 Z" class="highlight" />
+    </g>
+    <path d="M 1249.0,763.0H 1360V 779.0 H 1417.0" class="connection" />
+   </g>
+   <g class="pin-connection-group">
+    <g transform="translate(1142.0, 756)">
+     <path d="M 107,0 H 0 l -7.0,7.0 l 7.0,7.0 H 107" class="highlight" />
+    </g>
+    <g transform="translate(1424, 788)">
+     <path d="M 0,0H 105 V 14 H 0 l -7.0,-7.0 Z" class="highlight" />
+    </g>
+    <path d="M 1249.0,763.0H 1360V 795.0 H 1417.0" class="connection" />
+   </g>
+   <g class="pin-connection-group">
+    <g transform="translate(1142.0, 772)">
+     <path d="M 107,0 H 0 l -7.0,7.0 l 7.0,7.0 H 107" class="highlight" />
+    </g>
+    <g transform="translate(1424, 804)">
+     <path d="M 0,0H 105 V 14 H 0 l -7.0,-7.0 Z" class="highlight" />
+    </g>
+    <path d="M 1249.0,779.0H 1344V 811.0 H 1417.0" class="connection" />
+   </g>
+   <g class="pin-connection-group">
+    <g transform="translate(1142.0, 772)">
+     <path d="M 107,0 H 0 l -7.0,7.0 l 7.0,7.0 H 107" class="highlight" />
+    </g>
+    <g transform="translate(1424, 820)">
+     <path d="M 0,0H 105 V 14 H 0 l -7.0,-7.0 Z" class="highlight" />
+    </g>
+    <path d="M 1249.0,779.0H 1344V 827.0 H 1417.0" class="connection" />
    </g>
   </g>
  </g>

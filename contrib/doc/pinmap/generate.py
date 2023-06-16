@@ -181,7 +181,7 @@ class CpuPin:
         return f'CpuPin({self.port_pin}, {self.package_pin})'
 
 class Module:
-    def __init__(self, name, pins, chip_name = None):
+    def __init__(self, name, pins, chip_name = None, indirect_pins=None):
         self.name = name
         self.pins = { pin.name: pin for pin in pins }
         self.pins_ordered = pins
@@ -189,14 +189,27 @@ class Module:
             pin.module = self
         self.chip_name = chip_name
 
+        if indirect_pins is not None:
+            self.indirect_pins = dict()
+            for pin in indirect_pins:
+                self.indirect_pins[pin.name] = pin
+                pin.module = self
+            self.indirect_pins_ordered = indirect_pins
+        else:
+            self.indirect_pins = None
+            self.indirect_pins_ordered = None
+
     def render(self, parent, top, left, facing_left):
-        width = MODULE_WIDTH
         root_g = ET.SubElement(parent, 'g')
         g = ET.SubElement(root_g, 'g')
         g.attrib['transform'] = f'translate({left}, {top})'
         g.attrib['class'] = 'module'
 
         height = UNIT_HEIGHT + 2 * (PADDING + LINE_WEIGHT) + len(self.pins) * SPACING
+        if self.indirect_pins is not None:
+            width = 2 * MODULE_WIDTH
+        else:
+            width = MODULE_WIDTH
 
         if self.chip_name is not None:
             height += UNIT_HEIGHT + (LINE_WEIGHT) + PADDING
@@ -246,13 +259,25 @@ class Module:
             text.attrib['text-anchor'] = 'middle'
             text.attrib['dominant-baseline'] = 'middle'
 
-        pin_width = width - 15
+        pin_instep = 15
+        pin_width = MODULE_WIDTH - pin_instep
         for (i, pin) in enumerate(self.pins_ordered):
             y = top + 3 * PADDING + SPACING * (i + 1)
-            x = left
-            if not facing_left:
-                x += 15 - LINE_WEIGHT / 2
+            if facing_left:
+                x = left
+            else:
+                x = left + pin_instep - LINE_WEIGHT / 2
             pin.render(root_g, y, x, pin_width, facing_left)
+
+        if self.indirect_pins is not None:
+            for (i, pin) in enumerate(self.indirect_pins_ordered):
+                y = top + 3 * PADDING + SPACING * (i + 1)
+                x = left + MODULE_WIDTH
+                if facing_left:
+                    x = left + MODULE_WIDTH + pin_instep - LINE_WEIGHT / 2
+                else:
+                    x = left + 2 * pin_instep + MODULE_WIDTH - LINE_WEIGHT / 2
+                pin.render(root_g, y, x, pin_width, not(facing_left))
 
 class Wire:
     def __init__(self, pin_a, pin_b, directions=None):
@@ -385,12 +410,12 @@ MOD_AUDIO_JACKS = Module('Audio Jacks', [
     Pin('Headphone Detect', 'o'),
     Pin('Line In Detect', 'o'),
     Pin('Headphone L', 'indirect_i'),
-    Pin('Headphone R', 'indirect_i'),
     Pin('¼" Output L', 'indirect_i'),
+    Pin('Headphone R', 'indirect_i'),
     Pin('¼" Output R', 'indirect_i'),
     Pin('Line In L', 'indirect_o'),
-    Pin('Line In R', 'indirect_o'),
     Pin('Mic In L', 'indirect_o'),
+    Pin('Line In R', 'indirect_o'),
     Pin('Mic In R', 'indirect_o'),
     Pin('Mic Detect', 'o'),
 ])
@@ -398,16 +423,23 @@ MOD_AUDIO_JACKS = Module('Audio Jacks', [
 MOD_AUDIO_DAC = Module('Audio DAC', [
     Pin('SCLK', 'i'),
     Pin('Chip Select', 'i'),
-    Pin('Audio Out', 'o'),
-    Pin('Audio In', 'i'),
+    Pin('Data Out', 'o'),
+    Pin('Data In', 'i'),
     Pin('CODEC Enable', 'i'),
     Pin('MCLK', 'i'),
-], 'Cirrus Logic CS4270')
+], 'Cirrus Logic CS4270', indirect_pins=[
+    Pin('Audio Out L', 'indirect_o'),
+    Pin('Audio Out R', 'indirect_o'),
+    Pin('Audio In L', 'indirect_i'),
+    Pin('Audio In R', 'indirect_i'),
+])
 
 MOD_PIC = Module('LED and Pad Control', [
     Pin('UART TX', 'o'),
     Pin('UART RX', 'i'),
-], 'PIC24FJ256')
+], 'PIC24FJ256', indirect_pins = [
+    Pin('OLED CS', 'indirect_o')
+])
 
 MOD_MIDI = Module('MIDI UART', [
     Pin('IN', 'i'),
@@ -534,8 +566,8 @@ PINS = {
         ( 7,  28): MOD_CLOCK_IO.pins['Synced LED'],
         ( 8,  29): MOD_AUDIO_DAC.pins['SCLK'],
         ( 9,  30): MOD_AUDIO_DAC.pins['Chip Select'],
-        (10,  32): MOD_AUDIO_DAC.pins['Audio Out'],
-        (11,  33): MOD_AUDIO_DAC.pins['Audio In'],
+        (10,  32): MOD_AUDIO_DAC.pins['Data Out'],
+        (11,  33): MOD_AUDIO_DAC.pins['Data In'],
         (12,  35): MOD_AUDIO_DAC.pins['CODEC Enable'],
         # (13,  38): not connected?,
         # connected to RX on the RZ/A1L
@@ -850,6 +882,7 @@ def main():
                 port_wires = wires_by_cpu_port[port].get(port_pin, [])
                 port_wires.append(wire)
                 wires_by_cpu_port[port][port_pin] = port_wires
+
     # SDRAM address bus
     for i in range(15):
         wires_by_cpu_port[3][i][0].directions = [('X', 325 - 4 * i)]
@@ -921,21 +954,26 @@ def main():
     ]
 
     # Pad control
-    # TODO: define the wire for the OLED CS here
     wires_by_cpu_port[1][ 9][0].directions = [('X', CPU_RIGHT + 3 * SPACING)]
     wires_by_cpu_port[3][15][0].directions = [('X', CPU_LEFT - 2 * SPACING)]
+    wires.append(
+        Wire(
+            MOD_PIC.indirect_pins['OLED CS'],
+            MOD_OLED.pins['CS'],
+            [('X', right_col[2] - 2 * SPACING)]
+        )
+    )
 
     # Flash Memory
-    wires_by_cpu_port[4][2][0].directions = [('X', CPU_RIGHT + 6 * SPACING)]
-    wires_by_cpu_port[4][6][0].directions = [('X', CPU_RIGHT + 7 * SPACING)]
-    wires_by_cpu_port[4][7][0].directions = [('X', CPU_RIGHT + 8 * SPACING)]
+    wires_by_cpu_port[4][2][0].directions = [('X', CPU_RIGHT + 6 * SPACING + 0)]
+    wires_by_cpu_port[4][6][0].directions = [('X', CPU_RIGHT + 6 * SPACING + 4)]
+    wires_by_cpu_port[4][7][0].directions = [('X', CPU_RIGHT + 6 * SPACING + 8)]
 
     # OLED
     wires_by_cpu_port[6][0][0].directions = [('X', CPU_RIGHT + 9 * SPACING)]
     wires_by_cpu_port[6][2][0].directions = [('X', CPU_RIGHT + 10 * SPACING)]
 
     # Audio Jacks
-    # TODO: define the wires for headphone/quarter inch l/r and line in/mic l/r once we have the audio dac widened
     wires_by_cpu_port[6][3][0].directions = [
         ('X', CPU_RIGHT + 10 * SPACING),
         ('y', SPACING),
@@ -960,6 +998,65 @@ def main():
 
     # Audio DAC
     wires_by_cpu_port[7][11][0].directions = [('X', CPU_RIGHT + 8 * SPACING)]
+    wires.append(
+        Wire(
+            MOD_AUDIO_DAC.indirect_pins['Audio Out L'],
+            MOD_AUDIO_JACKS.pins['Headphone L'],
+            [('X', right_col[2] - 3 * SPACING)]
+        )
+    )
+    wires.append(
+        Wire(
+            MOD_AUDIO_DAC.indirect_pins['Audio Out L'],
+            MOD_AUDIO_JACKS.pins['¼" Output L'],
+            [('X', right_col[2] - 3 * SPACING)]
+        )
+    )
+
+    wires.append(
+        Wire(
+            MOD_AUDIO_DAC.indirect_pins['Audio Out R'],
+            MOD_AUDIO_JACKS.pins['Headphone R'],
+            [('X', right_col[2] - 3 * SPACING)]
+        )
+    )
+    wires.append(
+        Wire(
+            MOD_AUDIO_DAC.indirect_pins['Audio Out R'],
+            MOD_AUDIO_JACKS.pins['¼" Output R'],
+            [('X', right_col[2] - 3 * SPACING)]
+        )
+    )
+
+    wires.append(
+        Wire(
+            MOD_AUDIO_DAC.indirect_pins['Audio In L'],
+            MOD_AUDIO_JACKS.pins['Line In L'],
+            [('X', right_col[2] - 4 * SPACING)]
+        )
+    )
+    wires.append(
+        Wire(
+            MOD_AUDIO_DAC.indirect_pins['Audio In L'],
+            MOD_AUDIO_JACKS.pins['Mic In L'],
+            [('X', right_col[2] - 4 * SPACING)]
+        )
+    )
+
+    wires.append(
+        Wire(
+            MOD_AUDIO_DAC.indirect_pins['Audio In R'],
+            MOD_AUDIO_JACKS.pins['Line In R'],
+            [('X', right_col[2] - 5 * SPACING)]
+        )
+    )
+    wires.append(
+        Wire(
+            MOD_AUDIO_DAC.indirect_pins['Audio In R'],
+            MOD_AUDIO_JACKS.pins['Mic In R'],
+            [('X', right_col[2] - 5 * SPACING)]
+        )
+    )
 
     # MIDI UART
     wires_by_cpu_port[6][14][0].directions = [
