@@ -684,7 +684,7 @@ SPACING = UNIT_HEIGHT + LINE_WEIGHT
 MODULE_WIDTH = 120
 CPU_PIN_WIDTH = 58
 CPU_PORT_WIDTH = 80
-CPU_WIDTH = 600
+CPU_WIDTH = CPU_PORT_WIDTH * 7
 CPU_LEFT = 400
 CPU_TOP = 100
 CPU_RIGHT = CPU_LEFT + CPU_WIDTH
@@ -771,14 +771,122 @@ def render_cpu_port(parent, top, left, port, facing_left, cpu_pins):
 
     return height
 
+def path_finger(port_tops, finger_start, finger_end, port, start_pin, end_pin):
+    # Generate the path segment representing a finger, from the bottom up
+    port_top = port_tops[port]
+    p = f'V {port_top + (end_pin + 1) * SPACING - LINE_WEIGHT}'
+    p += f'H {finger_start}'
+    p += f'V {port_top + start_pin * SPACING}'
+    p += f'H {finger_end}'
+    return p
+
 def render_peripherals(g, port_tops):
+    finger_width = 20
     # Render BSC
     path = ET.SubElement(g, 'path')
-    p = f'M 14,{port_tops[2]}'
-    p += f'H 0'
-    p += f'H {4*CPU_PIN_WIDTH}'
+    left_finger_start = CPU_PIN_WIDTH + 2 * LINE_WEIGHT
+    left_finger_end = CPU_PORT_WIDTH + finger_width
+    peripheral_width = 2 * CPU_PORT_WIDTH
+    p = f'M {peripheral_width},{port_tops[2]}'
+    p += path_finger(port_tops, left_finger_start, left_finger_end, 5, 0, 15)
+    p += path_finger(port_tops, left_finger_start, left_finger_end, 3, 0, 14)
+    p += path_finger(port_tops, left_finger_start, left_finger_end, 2, 0,  6)
+    p += 'Z'
     path.attrib['d'] = p
-    path.attrib['style'] = 'stroke:black; stroke-width: 2px'
+    path.attrib['class'] = 'peripheral-bsc'
+    render_text(g,
+        port_tops[2] + LINE_WEIGHT + HALF_HEIGHT,
+        peripheral_width - PADDING,
+        'BSC',
+        anchor='end'
+    )
+
+    # Render SSIO0
+    path = ET.SubElement(g, 'path')
+    finger_start = CPU_WIDTH - (CPU_PIN_WIDTH + 2 * LINE_WEIGHT)
+    finger_end = CPU_WIDTH - (CPU_PORT_WIDTH + finger_width)
+    p = f'M {CPU_WIDTH - peripheral_width - CPU_PORT_WIDTH},{port_tops[6] + 8 * SPACING}'
+    p += path_finger(port_tops, finger_start, finger_end, 7, 9, 9)
+    p += path_finger(port_tops, finger_start, finger_end, 6, 8, 12)
+    p += 'Z'
+    path.attrib['d'] = p
+    path.attrib['class'] = 'peripheral-ssi0'
+    render_text(g,
+        port_tops[6] + 8 * SPACING + LINE_WEIGHT + HALF_HEIGHT,
+        CPU_WIDTH - peripheral_width - CPU_PORT_WIDTH + PADDING,
+        'SSI 0'
+    )
+
+    # Render sdhost
+    path = ET.SubElement(g, 'path')
+    p = f'M {CPU_WIDTH - peripheral_width},{port_tops[7]}'
+    p += path_finger(port_tops, finger_start, finger_end, 7, 0,  7)
+    p += 'Z'
+    path.attrib['d'] = p
+    path.attrib['class'] = 'peripheral-sdhost'
+    render_text(g,
+        port_tops[7] + LINE_WEIGHT + HALF_HEIGHT,
+        CPU_WIDTH - peripheral_width + PADDING,
+        'SD HOST'
+    )
+
+    # Render UART 0 (MIDI)
+    path = ET.SubElement(g, 'path')
+    p = f'M {CPU_WIDTH - peripheral_width},{port_tops[6] + 13 * SPACING}'
+    p += path_finger(port_tops, finger_start, finger_end, 6, 13, 14)
+    p += 'Z'
+    path.attrib['d'] = p
+    path.attrib['class'] = 'peripheral-midi'
+    render_text(g,
+        port_tops[6] + 13 * SPACING + LINE_WEIGHT + HALF_HEIGHT,
+        CPU_WIDTH - peripheral_width + PADDING,
+        'UART 0'
+    )
+
+    # Renesas SPI
+    path = ET.SubElement(g, 'path')
+    p = f'M {CPU_WIDTH - peripheral_width},{port_tops[6]}'
+    p += path_finger(port_tops, finger_start, finger_end, 6, 0, 2)
+    p += 'Z'
+    path.attrib['d'] = p
+    path.attrib['class'] = 'peripheral-spi'
+    render_text(g,
+        port_tops[6] + LINE_WEIGHT + HALF_HEIGHT,
+        CPU_WIDTH - peripheral_width + PADDING,
+        'SPI'
+    )
+
+    # Multi I/O Bus control
+    path = ET.SubElement(g, 'path')
+    p = f'M {CPU_WIDTH - peripheral_width},{port_tops[4] + 2 * SPACING}'
+    p += path_finger(port_tops, finger_start, finger_end, 4, 2, 7)
+    p += 'Z'
+    path.attrib['d'] = p
+    path.attrib['class'] = 'peripheral-multio'
+    render_text(g,
+        port_tops[4] + 2 * SPACING + LINE_WEIGHT + HALF_HEIGHT,
+        CPU_WIDTH - peripheral_width + PADDING,
+        'SPI Multi-I/O'
+    )
+
+    # UART 1 (LED and Pad Control)
+    path = ET.SubElement(g, 'path')
+    p = f'M {4 * CPU_PORT_WIDTH},{port_tops[1] + 10 * SPACING - LINE_WEIGHT}'
+    p += f'H {finger_start}'
+    p += f'V {port_tops[1] + 9 * SPACING}'
+    p += f'H {CPU_PORT_WIDTH * 3}'
+    p += f'V {port_tops[3] + 15 * SPACING}'
+    p += f'H {left_finger_start}'
+    p += f'V {port_tops[3] + 16 * SPACING - LINE_WEIGHT}'
+    p += f'H {CPU_PORT_WIDTH * 4}'
+    p += 'Z'
+    path.attrib['d'] = p
+    path.attrib['class'] = 'peripheral-padio'
+    render_text(g,
+        port_tops[1] + 9 * SPACING + LINE_WEIGHT + HALF_HEIGHT,
+        3 * CPU_PORT_WIDTH + PADDING,
+        'UART1'
+    )
 
 def render_cpu(parent, top, left, cpu_pins):
     width = CPU_WIDTH
@@ -806,7 +914,7 @@ def render_cpu(parent, top, left, cpu_pins):
     port_top = top + PADDING
     port_left = left + width - (CPU_PORT_WIDTH + PADDING)
     for port in [1, 4, 6, 7]:
-        port_tops[port] = port_top + UNIT_HEIGHT + PADDING - top
+        port_tops[port] = port_top + UNIT_HEIGHT + PADDING + LINE_WEIGHT - top
         port_top += render_cpu_port(parent, port_top, port_left, port, False, cpu_pins)
         port_top += UNIT_HEIGHT
     port_top += PADDING - (UNIT_HEIGHT + top)
@@ -818,6 +926,9 @@ def render_cpu(parent, top, left, cpu_pins):
     render_roundrect(g, height - UNIT_HEIGHT, 0, 120, UNIT_HEIGHT, clazz='cpu-label')
     render_text(g, height - HALF_HEIGHT, 3, 'R7S721020VCFP (RZ/A1L)')
 
+    # use a separate group
+    g = ET.SubElement(parent, 'g')
+    g.attrib['transform'] = f'translate({left}, {top})'
     render_peripherals(g, port_tops)
 
 def main():

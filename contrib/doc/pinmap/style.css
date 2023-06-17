@@ -105,3 +105,45 @@ text {
 .pin-connection-group:hover .cpu-pin * {
   stroke: #e67f7f;
 }
+
+.peripheral-bsc {
+  stroke:black;
+  stroke-width: 2px;
+  fill: #e6cfcf;
+}
+
+.peripheral-sdhost {
+  stroke:black;
+  stroke-width: 2px;
+  fill: #e6e6cf;
+}
+
+.peripheral-ssi0 {
+  stroke:black;
+  stroke-width: 2px;
+  fill: #cfe6cf;
+}
+
+.peripheral-midi {
+  stroke:black;
+  stroke-width: 2px;
+  fill: #cfe6e6;
+}
+
+.peripheral-spi {
+  stroke:black;
+  stroke-width: 2px;
+  fill: #cfcfe6;
+}
+
+.peripheral-multio {
+  stroke:black;
+  stroke-width: 2px;
+  fill: #e6cfe6;
+}
+
+.peripheral-padio {
+  stroke:black;
+  stroke-width: 2px;
+  fill: #cfe6e6;
+}
