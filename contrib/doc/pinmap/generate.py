@@ -80,13 +80,6 @@ class Pin:
         self.tip_y = self.top + HALF_HEIGHT
         path.attrib['class'] = clazz
 
-    def render_label(self, g):
-        text = ET.SubElement(g, 'text')
-        text.text = self.name
-        text.attrib['x'] = '3'
-        text.attrib['y'] = str(HALF_HEIGHT)
-        text.attrib['text-anchor'] = 'left'
-
     def render(self, parent, top, left, pin_width, facing_left):
         self.top = top
         self.left = left
@@ -97,7 +90,7 @@ class Pin:
         g.attrib['transform'] = f'translate({left}, {top})'
 
         Pin.PIN_RENDER_FUNCTIONS[self.type](self, g, Pin.VIEW_CLASS[self.type])
-        self.render_label(g)
+        render_text(g, HALF_HEIGHT, 3, self.name)
 
         self.svg = g
 
@@ -155,12 +148,7 @@ class CpuPin:
         if not facing_left:
             backg_port_pin.attrib['x'] = str(CPU_PIN_WIDTH - port_pin_width)
 
-        backg = ET.SubElement(g, 'rect')
-        backg.attrib['rx'] = '5'
-        backg.attrib['ry'] = '5'
-        backg.attrib['width'] = str(CPU_PIN_WIDTH)
-        backg.attrib['height'] = str(UNIT_HEIGHT)
-        backg.attrib['class'] = 'port-label'
+        render_roundrect(g, 0, 0, CPU_PIN_WIDTH, UNIT_HEIGHT, clazz='port-label')
 
         label = ET.SubElement(g, 'text')
         label.text = f'Pin {self.port_pin}'
@@ -196,12 +184,7 @@ class CpuPin:
         g.attrib['transform'] = f'translate({self.left}, {self.top})'
         g.attrib['class'] = 'cpu-pin highlight'
 
-        backg = ET.SubElement(g, 'rect')
-        backg.attrib['rx'] = '5'
-        backg.attrib['ry'] = '5'
-        backg.attrib['width'] = str(CPU_PIN_WIDTH)
-        backg.attrib['height'] = str(UNIT_HEIGHT)
-        backg.attrib['class'] = 'port-label'
+        render_roundrect(g, 0, 0, CPU_PIN_WIDTH, UNIT_HEIGHT, clazz='port-label')
 
     def __repr__(self):
         return f'CpuPin({self.port_pin}, {self.package_pin})'
@@ -247,20 +230,8 @@ class Module:
         self.top = top
         self.left = left
 
-        base_rect = ET.SubElement(g, 'rect')
-        base_rect.attrib['x'] = '0'
-        base_rect.attrib['y'] = '0'
-        base_rect.attrib['rx'] = '5'
-        base_rect.attrib['ry'] = '5'
-        base_rect.attrib['width'] = str(width)
-        base_rect.attrib['height'] = str(height)
-
-        text = ET.SubElement(g, 'text')
-        text.text = self.name
-        text.attrib['x'] = str(width / LINE_WEIGHT)
-        text.attrib['y'] = str(HALF_HEIGHT + PADDING)
-        text.attrib['text-anchor'] = 'middle'
-        text.attrib['dominant-baseline'] = 'middle'
+        render_roundrect(g, 0, 0, width, height)
+        render_text(g, HALF_HEIGHT + PADDING, width / 2, self.name, anchor='middle', baseline='middle')
 
         separator = ET.SubElement(g, 'path')
         separator.attrib['d'] = f'M 0,{UNIT_HEIGHT+2*PADDING} H {width}'
@@ -270,20 +241,16 @@ class Module:
             chip_rect_height = SPACING
             chip_rect_x = 10
             chip_rect_y = height - chip_rect_height
-            chip_rect = ET.SubElement(g, 'rect')
-            chip_rect.attrib['x'] = str(chip_rect_x)
-            chip_rect.attrib['y'] = str(chip_rect_y)
-            chip_rect.attrib['rx'] = '5'
-            chip_rect.attrib['ry'] = '5'
-            chip_rect.attrib['width'] = str(chip_rect_width)
-            chip_rect.attrib['height'] = str(chip_rect_height)
 
-            text = ET.SubElement(g, 'text')
-            text.text = self.chip_name
-            text.attrib['x'] = str(chip_rect_x + chip_rect_width / 2)
-            text.attrib['y'] = str(chip_rect_y + chip_rect_height / 2)
-            text.attrib['text-anchor'] = 'middle'
-            text.attrib['dominant-baseline'] = 'middle'
+            render_roundrect(g, chip_rect_y, chip_rect_x, chip_rect_width, chip_rect_height)
+
+            render_text(g,
+                chip_rect_y + chip_rect_height / 2,
+                chip_rect_x + chip_rect_width / 2,
+                self.chip_name,
+                anchor='middle',
+                baseline='middle'
+            )
 
         pin_instep = 15
         pin_width = MODULE_WIDTH - pin_instep
@@ -717,7 +684,7 @@ SPACING = UNIT_HEIGHT + LINE_WEIGHT
 MODULE_WIDTH = 120
 CPU_PIN_WIDTH = 58
 CPU_PORT_WIDTH = 80
-CPU_WIDTH = 400
+CPU_WIDTH = 600
 CPU_LEFT = 400
 CPU_TOP = 100
 CPU_RIGHT = CPU_LEFT + CPU_WIDTH
@@ -743,6 +710,31 @@ def are_pins_bus(pins):
     except StopIteration:
         return False
 
+def render_text(parent, top, left, text, clazz=None, anchor=None, baseline=None):
+    t = ET.SubElement(parent, 'text')
+    t.text = text
+    t.attrib['x'] = str(left)
+    t.attrib['y'] = str(top)
+    if anchor is not None:
+        t.attrib['text-anchor'] = anchor
+    if clazz is not None:
+        t.attrib['class'] = clazz
+    if baseline is not None:
+        t.attrib['dominant-baseline'] = baseline
+
+    return t
+
+def render_roundrect(parent, top, left, w, h, clazz=None):
+    r = ET.SubElement(parent, 'rect')
+    r.attrib['x'] = str(left)
+    r.attrib['y'] = str(top)
+    r.attrib['rx'] = '5'
+    r.attrib['ry'] = '5'
+    r.attrib['width'] = str(w)
+    r.attrib['height'] = str(h)
+    if clazz is not None:
+        r.attrib['class'] = clazz
+
 def render_cpu_port(parent, top, left, port, facing_left, cpu_pins):
     port_data = PINS[port]
 
@@ -761,25 +753,10 @@ def render_cpu_port(parent, top, left, port, facing_left, cpu_pins):
     elements_root = ET.SubElement(parent, 'g')
     elements_root.attrib['transform'] = f'translate({left}, {top})'
 
-    base = ET.SubElement(elements_root, 'rect')
-    base.attrib['rx'] = '5'
-    base.attrib['ry'] = '5'
-    base.attrib['width'] = str(width)
-    base.attrib['height'] = str(height)
-    base.attrib['class'] = 'port-base'
+    render_roundrect(elements_root, 0, 0, width, height, clazz='port-base')
 
-    label_rect = ET.SubElement(elements_root, 'rect')
-    label_rect.attrib['rx'] = '5'
-    label_rect.attrib['ry'] = '5'
-    label_rect.attrib['width'] = '50'
-    label_rect.attrib['height'] = str(UNIT_HEIGHT)
-    label_rect.attrib['class'] = 'port-label'
-
-    label = ET.SubElement(elements_root, 'text')
-    label.text = f'Port {port}'
-    label.attrib['x'] = '3'
-    label.attrib['y'] = str(HALF_HEIGHT)
-    label.attrib['text-anchor'] = 'left'
+    render_roundrect(elements_root, 0, 0, 50, UNIT_HEIGHT, clazz='port-label')
+    render_text(elements_root, HALF_HEIGHT, 3, f'Port {port}', anchor='left')
 
     pin_top = top + UNIT_HEIGHT + PADDING + LINE_WEIGHT
     if facing_left:
@@ -794,19 +771,32 @@ def render_cpu_port(parent, top, left, port, facing_left, cpu_pins):
 
     return height
 
+def render_peripherals(g, port_tops):
+    # Render BSC
+    path = ET.SubElement(g, 'path')
+    p = f'M 14,{port_tops[2]}'
+    p += f'H 0'
+    p += f'H {4*CPU_PIN_WIDTH}'
+    path.attrib['d'] = p
+    path.attrib['style'] = 'stroke:black; stroke-width: 2px'
+
 def render_cpu(parent, top, left, cpu_pins):
     width = CPU_WIDTH
-    base = ET.SubElement(parent, 'rect')
-    base.attrib['x'] = str(left)
-    base.attrib['y'] = str(top)
+    g = ET.SubElement(parent, 'g')
+    g.attrib['transform'] = f'translate({left}, {top})'
+
+    base = ET.SubElement(g, 'rect')
     base.attrib['width'] = str(width)
     base.attrib['rx'] = '5'
     base.attrib['ry'] = '5'
     base.attrib['class'] = 'cpu'
 
+    port_tops = dict()
+
     # left hand ports
     port_top = top + PADDING
     for port in [0, 2, 3, 5]:
+        port_tops[port] = port_top + UNIT_HEIGHT + PADDING + LINE_WEIGHT - top
         port_top += render_cpu_port(parent, port_top, left + PADDING, port, True, cpu_pins)
         port_top += UNIT_HEIGHT
     port_top += PADDING - (UNIT_HEIGHT + top)
@@ -816,6 +806,7 @@ def render_cpu(parent, top, left, cpu_pins):
     port_top = top + PADDING
     port_left = left + width - (CPU_PORT_WIDTH + PADDING)
     for port in [1, 4, 6, 7]:
+        port_tops[port] = port_top + UNIT_HEIGHT + PADDING - top
         port_top += render_cpu_port(parent, port_top, port_left, port, False, cpu_pins)
         port_top += UNIT_HEIGHT
     port_top += PADDING - (UNIT_HEIGHT + top)
@@ -823,6 +814,11 @@ def render_cpu(parent, top, left, cpu_pins):
         height = port_top
 
     base.attrib['height'] = str(height)
+
+    render_roundrect(g, height - UNIT_HEIGHT, 0, 120, UNIT_HEIGHT, clazz='cpu-label')
+    render_text(g, height - HALF_HEIGHT, 3, 'R7S721020VCFP (RZ/A1L)')
+
+    render_peripherals(g, port_tops)
 
 def main():
     ET.register_namespace('', 'http://www.w3.org/2000/svg')
@@ -842,11 +838,7 @@ def main():
         style.text = inf.read()
     cpu_pin_clip = ET.SubElement(defs, 'clipPath')
     cpu_pin_clip.attrib['id'] = 'cpu-pin-clip'
-    cpu_pin_clip_rect = ET.SubElement(cpu_pin_clip, 'rect')
-    cpu_pin_clip_rect.attrib['width'] = str(CPU_PIN_WIDTH)
-    cpu_pin_clip_rect.attrib['height'] = str(UNIT_HEIGHT)
-    cpu_pin_clip_rect.attrib['rx'] = '5'
-    cpu_pin_clip_rect.attrib['ry'] = '5'
+    render_roundrect(cpu_pin_clip, 0, 0, CPU_PIN_WIDTH, UNIT_HEIGHT)
 
     root_group = ET.SubElement(root, 'g')
 

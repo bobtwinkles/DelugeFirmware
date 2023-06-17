@@ -33,6 +33,12 @@ text {
   fill: #7ee5dfff;
 }
 
+.cpu-label {
+  stroke: black;
+  stroke-width: 2px;
+  fill: #e6e6e6;
+}
+
 .module rect {
   stroke: black;
   stroke-width: 2px;
