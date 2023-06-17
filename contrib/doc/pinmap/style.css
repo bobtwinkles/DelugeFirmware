@@ -77,7 +77,7 @@ text {
 }
 
 .connection {
-  stroke: black;
+  stroke: #525266;
   stroke-width: 2px;
   fill: none;
 }
