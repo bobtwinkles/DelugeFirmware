@@ -18,7 +18,17 @@ jobs:
       # required so we can push to the branch
       contents: write
     steps:
+      # For non-PR runs, use the normal checkout flow
       - uses: actions/checkout@v3
+        if: github.event_name != 'pull_request'
+      # for pull requests specifically, we need to check out as though we're
+      # running from the PR's repo so the auto-commit action works.
+      - uses: actions/checkout@v3
+        if: github.event_name == 'pull_request'
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+
       - name: Run clang-format style check for C/C++ code
         uses: DoozyX/clang-format-lint-action@v0.16.2
         env:
