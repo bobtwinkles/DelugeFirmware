@@ -33,6 +33,14 @@ Button::Button(uint8_t value) {
 #endif
 }
 
+uint8_t Button::toChar() {
+#if DELUGE_MODEL == DELUGE_MODEL_40_PAD
+	return 10 * (y + displayHeight) + x;
+#else
+	return 9 * (y + displayHeight * 2) + x;
+#endif
+}
+
 bool Button::isButton() {
 	return y >= displayHeight;
 }

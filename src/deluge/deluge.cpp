@@ -108,6 +108,8 @@ extern "C" {
 #include "RZA1/ssi/ssi.h"
 }
 
+#include "vm/wrenimpl.h"
+
 extern uint8_t currentlyAccessingCard;
 
 extern "C" void disk_timerproc(UINT msPassed);
@@ -858,6 +860,9 @@ resetSettings:
 	Uart::println("going into main loop");
 	sdRoutineLock = false; // Allow SD routine to start happening
 
+	Wren::VM* wren = new Wren::VM();
+	Buttons::wren = wren;
+
 	while (1) {
 
 		uiTimerManager.routine();
@@ -897,6 +902,8 @@ resetSettings:
 #if AUTOPILOT_TEST_ENABLED
 		autoPilotStuff();
 #endif
+
+		wren->tick();
 	}
 
 	return 0;

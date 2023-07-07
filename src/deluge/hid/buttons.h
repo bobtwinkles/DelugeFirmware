@@ -19,11 +19,13 @@
 #define BUTTONS_H_
 
 #include "RZA1/system/r_typedefs.h"
+#include "vm/wrenimpl.h"
 #include "button.h"
 
 namespace Buttons {
 
 int buttonAction(hid::Button b, bool on, bool inCardRoutine);
+int buttonActionNoRe(hid::Button b, bool on, bool inCardRoutine);
 bool isButtonPressed(int x, int y);
 bool isButtonPressed(hid::Button b);
 bool isShiftButtonPressed();
@@ -31,6 +33,7 @@ bool isNewOrShiftButtonPressed();
 void noPressesHappening(bool inCardRoutine);
 
 extern bool recordButtonPressUsedUp;
+extern Wren::VM* wren;
 } // namespace Buttons
 
 #endif /* BUTTONS_H_ */
