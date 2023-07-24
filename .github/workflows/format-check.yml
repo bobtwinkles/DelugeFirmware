@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - 'community'
+    paths:
+      - '.github/workflows/format-check.yml'
+      - '**.c'
+      - '**.cpp'
+      - '**.h'
+      - '**.hpp'
   pull_request:
     branches:
       - 'community'

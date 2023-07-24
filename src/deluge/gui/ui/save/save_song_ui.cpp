@@ -14,19 +14,20 @@
  * You should have received a copy of the GNU General Public License along with this program.
  * If not, see <https://www.gnu.org/licenses/>.
  */
+#include "definitions_cxx.hpp"
 #include "storage/audio/audio_file_manager.h"
 #include "gui/ui/save/save_song_ui.h"
 #include "util/functions.h"
 #include "util/lookuptables/lookuptables.h"
 #include "hid/display/numeric_driver.h"
 #include <string.h>
-#include "gui/context_menu/save_song_or_instrument_context_menu.h"
+#include "gui/context_menu/save_song_or_instrument.h"
 #include "model/sample/sample.h"
-#include "io/uart/uart.h"
+#include "io/debug/print.h"
 #include "gui/ui/audio_recorder.h"
 #include "gui/views/view.h"
 #include "storage/storage_manager.h"
-#include "gui/context_menu/context_menu_overwrite_file.h"
+#include "gui/context_menu/overwrite_file.h"
 #include "model/song/song.h"
 #include "hid/led/pad_leds.h"
 #include "hid/led/indicator_leds.h"
@@ -41,6 +42,9 @@ extern "C" {
 #include "ff.h"
 }
 
+using namespace deluge;
+using namespace gui;
+
 extern uint8_t currentlyAccessingCard;
 
 SaveSongUI saveSongUI{};
@@ -53,7 +57,7 @@ SaveSongUI::SaveSongUI() {
 }
 
 bool SaveSongUI::opened() {
-	instrumentTypeToLoad = 255;
+	instrumentTypeToLoad = InstrumentType::NONE;
 
 	// Grab screenshot of song, for saving, before qwerty drawn
 	memcpy(PadLEDs::imageStore, PadLEDs::image, sizeof(PadLEDs::image));
@@ -90,15 +94,15 @@ gotError:
 
 	enteredTextEditPos = 0; //enteredText.getLength();
 
-	IndicatorLEDs::setLedState(synthLedX, synthLedY, false);
-	IndicatorLEDs::setLedState(kitLedX, kitLedY, false);
-	IndicatorLEDs::setLedState(midiLedX, midiLedY, false);
+	indicator_leds::setLedState(IndicatorLED::SYNTH, false);
+	indicator_leds::setLedState(IndicatorLED::KIT, false);
+	indicator_leds::setLedState(IndicatorLED::MIDI, false);
 
-	IndicatorLEDs::setLedState(crossScreenEditLedX, crossScreenEditLedY, false);
-	IndicatorLEDs::setLedState(clipViewLedX, clipViewLedY, false);
-	IndicatorLEDs::setLedState(scaleModeLedX, scaleModeLedY, false);
+	indicator_leds::setLedState(IndicatorLED::CROSS_SCREEN_EDIT, false);
+	indicator_leds::setLedState(IndicatorLED::CLIP_VIEW, false);
+	indicator_leds::setLedState(IndicatorLED::SCALE_MODE, false);
 
-	IndicatorLEDs::blinkLed(sessionViewLedX, sessionViewLedY);
+	indicator_leds::blinkLed(IndicatorLED::SESSION_VIEW);
 
 	focusRegained();
 	return true;
@@ -142,16 +146,16 @@ gotError:
 	bool fileAlreadyExisted = storageManager.fileExists(filePath.get());
 
 	if (!mayOverwrite && fileAlreadyExisted) {
-		contextMenuOverwriteFile.currentSaveUI = this;
+		context_menu::overwriteFile.currentSaveUI = this;
 
-		bool available = contextMenuOverwriteFile.setupAndCheckAvailability();
+		bool available = context_menu::overwriteFile.setupAndCheckAvailability();
 
 		if (available) { // Always true.
 #if HAVE_OLED
 			OLED::removeWorkingAnimation();
 #endif
 			numericDriver.setNextTransitionDirection(1);
-			openUI(&contextMenuOverwriteFile);
+			openUI(&context_menu::overwriteFile);
 			return true;
 		}
 		else {
@@ -192,7 +196,7 @@ gotError:
 		// If this AudioFile is used in this Song...
 		if (audioFile->numReasonsToBeLoaded) {
 
-			if (audioFile->type == AUDIO_FILE_TYPE_SAMPLE) {
+			if (audioFile->type == AudioFileType::SAMPLE) {
 				// If this is a recording which still exists at its temporary location, move the file
 				if (!((Sample*)audioFile)->tempFilePathForRecording.isEmpty()) {
 					FRESULT result =
@@ -205,10 +209,10 @@ gotError:
 						// successful, something's gone wrong
 						anyErrorMovingTempFiles = true;
 						/*
-						Uart::print("rename failed. ");
-						Uart::println(result);
-						Uart::println(((Sample*)sample)->tempFilePathForRecording.get());
-						Uart::println(sample->filePath.get());
+						Debug::print("rename failed. ");
+						Debug::println(result);
+						Debug::println(((Sample*)sample)->tempFilePathForRecording.get());
+						Debug::println(sample->filePath.get());
 						*/
 					}
 				}
@@ -237,7 +241,7 @@ gotError:
 				}
 				else {
 					sourceFilePath =
-					    (audioFile->type != AUDIO_FILE_TYPE_SAMPLE
+					    (audioFile->type != AudioFileType::SAMPLE
 					     || ((Sample*)audioFile)->tempFilePathForRecording.isEmpty())
 					        ? audioFile->filePath.get()
 					        : ((Sample*)audioFile)
@@ -250,8 +254,8 @@ gotError:
 				// Open file to read
 				FRESULT result = f_open(&fileSystemStuff.currentFile, sourceFilePath, FA_READ);
 				if (result != FR_OK) {
-					Uart::println("open fail");
-					Uart::println(sourceFilePath);
+					Debug::println("open fail");
+					Debug::println(sourceFilePath);
 					error = ERROR_UNSPECIFIED;
 					goto gotError;
 				}
@@ -358,7 +362,7 @@ failAfterOpeningSourceFile:
 						result = f_read(&fileSystemStuff.currentFile, storageManager.fileClusterBuffer,
 						                audioFileManager.clusterSize, &bytesRead);
 						if (result) {
-							Uart::println("read fail");
+							Debug::println("read fail");
 fail3:
 							f_close(&recorderFileSystemStuff.currentFile);
 							error = ERROR_UNSPECIFIED;
@@ -372,8 +376,8 @@ fail3:
 						result = f_write(&recorderFileSystemStuff.currentFile, storageManager.fileClusterBuffer,
 						                 bytesRead, &bytesWritten);
 						if (result || bytesWritten != bytesRead) {
-							Uart::println("write fail");
-							Uart::println(result);
+							Debug::println("write fail");
+							Debug::println(result);
 							goto fail3;
 						}
 
@@ -428,8 +432,8 @@ fail3:
 		filePathDuringWrite.set(&filePath);
 	}
 
-	Uart::print("creating: ");
-	Uart::println(filePathDuringWrite.get());
+	Debug::print("creating: ");
+	Debug::println(filePathDuringWrite.get());
 
 	// Write the actual song file
 	error = storageManager.createXMLFile(filePathDuringWrite.get(), false);
@@ -484,12 +488,3 @@ cardError:
 	close();
 	return true;
 }
-
-#if DELUGE_MODEL == DELUGE_MODEL_40_PAD
-int SaveSongUI::padAction(int x, int y, int on) {
-	if (sdRoutineLock)
-		ACTION_RESULT_REMIND_ME_OUTSIDE_CARD_ROUTINE;
-	close();
-	return ACTION_RESULT_DEALT_WITH;
-}
-#endif

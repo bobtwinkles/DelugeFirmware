@@ -15,8 +15,7 @@
  * If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef MASTERCOMPRESSOR_H_
-#define MASTERCOMPRESSOR_H_
+#pragma once
 
 #include "RZA1/system/r_typedefs.h"
 
@@ -214,7 +213,8 @@ private:
 class MasterCompressor {
 public:
 	MasterCompressor();
-	void render(StereoSample* buffer, uint16_t numSamples);
+	void render(StereoSample* buffer, uint16_t numSamples, int32_t masterVolumeAdjustmentL,
+	            int32_t masterVolumeAdjustmentR);
 	double makeup;
 	double gr;
 	double wet;
@@ -231,5 +231,3 @@ public:
 
 	chunkware_simple::SimpleComp compressor;
 };
-
-#endif /* MASTERCOMPRESSOR_H_ */

@@ -17,7 +17,7 @@
 
 #include "gui/views/arranger_view.h"
 #include "processing/engines/audio_engine.h"
-#include "gui/context_menu/contextmenuclearsong.h"
+#include "gui/context_menu/clear_song.h"
 #include "model/clip/clip_instance.h"
 #include "model/clip/instrument_clip.h"
 #include "model/clip/instrument_clip_minder.h"
@@ -28,7 +28,7 @@
 #include "gui/views/session_view.h"
 #include "model/timeline_counter.h"
 #include "gui/views/view.h"
-#include "definitions.h"
+#include "definitions_cxx.hpp"
 #include "hid/matrix/matrix_driver.h"
 #include "hid/display/numeric_driver.h"
 #include "gui/ui/sound_editor.h"
@@ -40,7 +40,7 @@
 #include "model/drum/drum.h"
 #include "model/instrument/melodic_instrument.h"
 #include "playback/mode/arrangement.h"
-#include "io/uart/uart.h"
+#include "io/debug/print.h"
 #include "model/instrument/midi_instrument.h"
 #include "model/drum/kit.h"
 #include "model/song/song.h"
@@ -70,6 +70,7 @@
 #include "storage/file_item.h"
 #include "gui/ui_timer_manager.h"
 #include "gui/ui/load/load_song_ui.h"
+#include "gui/colour.h"
 
 #if HAVE_OLED
 #include "hid/display/oled.h"
@@ -78,14 +79,17 @@
 extern "C" {
 #include "RZA1/uart/sio_char.h"
 }
+
+using namespace deluge;
+using namespace gui;
+
 View view{};
 
-extern int8_t pendingGlobalMIDICommand;
+extern GlobalMIDICommand pendingGlobalMIDICommand;
 
 View::View() {
 	midiLearnFlashOn = false;
 
-	thingPressedForMidiLearn = 0;
 	deleteMidiCommandOnRelease = false;
 
 	learnedThing = NULL;
@@ -101,25 +105,25 @@ void View::focusRegained() {
 	uiTimerManager.unsetTimer(TIMER_SHORTCUT_BLINK);
 	setTripletsLedState();
 
-	IndicatorLEDs::setLedState(loadLedX, loadLedY, false);
-	IndicatorLEDs::setLedState(saveLedX, saveLedY, false);
+	indicator_leds::setLedState(IndicatorLED::LOAD, false);
+	indicator_leds::setLedState(IndicatorLED::SAVE, false);
 
-	IndicatorLEDs::setLedState(learnButtonX, learnButtonY, false);
+	indicator_leds::setLedState(IndicatorLED::LEARN, false);
 }
 
 void View::setTripletsLedState() {
 	RootUI* rootUI = getRootUI();
 
-	IndicatorLEDs::setLedState(tripletsLedX, tripletsLedY,
-	                           rootUI->isTimelineView() && ((TimelineView*)rootUI)->inTripletsView());
+	indicator_leds::setLedState(IndicatorLED::TRIPLETS,
+	                            rootUI->isTimelineView() && ((TimelineView*)rootUI)->inTripletsView());
 }
 
-extern int pendingGlobalMIDICommandNumClustersWritten;
+extern GlobalMIDICommand pendingGlobalMIDICommandNumClustersWritten;
 
-int View::buttonAction(hid::Button b, bool on, bool inCardRoutine) {
+ActionResult View::buttonAction(hid::Button b, bool on, bool inCardRoutine) {
 	using namespace hid::button;
 
-	int newGlobalMidiCommand;
+	GlobalMIDICommand newGlobalMidiCommand;
 
 	// Tap tempo button. Shouldn't move this to MatrixDriver, because this code can put us in tapTempo mode, and other UIs aren't built to
 	// handle this
@@ -127,21 +131,21 @@ int View::buttonAction(hid::Button b, bool on, bool inCardRoutine) {
 
 		if (currentUIMode == UI_MODE_MIDI_LEARN) {
 			if (inCardRoutine) {
-				return ACTION_RESULT_REMIND_ME_OUTSIDE_CARD_ROUTINE;
+				return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 			}
 			if (on) {
 				deleteMidiCommandOnRelease = true;
-				endMidiLearnPressSession(MIDI_LEARN_TAP_TEMPO_BUTTON);
-				learnedThing = &midiEngine.globalMIDICommands[GLOBAL_MIDI_COMMAND_TAP];
+				endMidiLearnPressSession(MidiLearn::TAP_TEMPO_BUTTON);
+				learnedThing = &midiEngine.globalMIDICommands[util::to_underlying(GlobalMIDICommand::TAP)];
 			}
 
-			else if (thingPressedForMidiLearn == MIDI_LEARN_TAP_TEMPO_BUTTON) {
+			else if (thingPressedForMidiLearn == MidiLearn::TAP_TEMPO_BUTTON) {
 doEndMidiLearnPressSession:
 				if (deleteMidiCommandOnRelease) {
 					learnedThing->clear();
 					shouldSaveSettingsAfterMidiLearn = true;
 				}
-				endMidiLearnPressSession(0);
+				endMidiLearnPressSession();
 			}
 		}
 		else if (currentUIMode == UI_MODE_NONE) {
@@ -161,16 +165,16 @@ doEndMidiLearnPressSession:
 	// MIDI learn button
 	else if (b == LEARN) {
 		if (inCardRoutine) {
-			return ACTION_RESULT_REMIND_ME_OUTSIDE_CARD_ROUTINE;
+			return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 		}
 
 		if (on) {
 			if (currentUIMode == UI_MODE_NONE || currentUIMode == UI_MODE_MIDI_LEARN) {
-				thingPressedForMidiLearn = 0;
+				thingPressedForMidiLearn = MidiLearn::NONE;
 				shouldSaveSettingsAfterMidiLearn = false;
 				currentUIMode = UI_MODE_MIDI_LEARN;
 				midiLearnFlash();
-				IndicatorLEDs::blinkLed(learnLedX, learnLedY, 255, 1);
+				indicator_leds::blinkLed(IndicatorLED::LEARN, 255, 1);
 			}
 		}
 		else {
@@ -183,15 +187,15 @@ doEndMidiLearnPressSession:
 	// Play button for MIDI learn
 	else if (b == PLAY && currentUIMode == UI_MODE_MIDI_LEARN) {
 		if (inCardRoutine) {
-			return ACTION_RESULT_REMIND_ME_OUTSIDE_CARD_ROUTINE;
+			return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 		}
 
 		if (on) {
 			deleteMidiCommandOnRelease = true;
-			endMidiLearnPressSession(MIDI_LEARN_PLAY_BUTTON);
-			learnedThing = &midiEngine.globalMIDICommands[GLOBAL_MIDI_COMMAND_PLAY];
+			endMidiLearnPressSession(MidiLearn::PLAY_BUTTON);
+			learnedThing = &midiEngine.globalMIDICommands[util::to_underlying(GlobalMIDICommand::PLAY)];
 		}
-		else if (thingPressedForMidiLearn == MIDI_LEARN_PLAY_BUTTON) {
+		else if (thingPressedForMidiLearn == MidiLearn::PLAY_BUTTON) {
 			goto doEndMidiLearnPressSession;
 		}
 	}
@@ -199,15 +203,15 @@ doEndMidiLearnPressSession:
 	// Record button for MIDI learn
 	else if (b == RECORD && currentUIMode == UI_MODE_MIDI_LEARN) {
 		if (inCardRoutine) {
-			return ACTION_RESULT_REMIND_ME_OUTSIDE_CARD_ROUTINE;
+			return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 		}
 
 		if (on) {
 			deleteMidiCommandOnRelease = true;
-			endMidiLearnPressSession(MIDI_LEARN_RECORD_BUTTON);
-			learnedThing = &midiEngine.globalMIDICommands[GLOBAL_MIDI_COMMAND_RECORD];
+			endMidiLearnPressSession(MidiLearn::RECORD_BUTTON);
+			learnedThing = &midiEngine.globalMIDICommands[util::to_underlying(GlobalMIDICommand::RECORD)];
 		}
-		else if (thingPressedForMidiLearn == MIDI_LEARN_RECORD_BUTTON) {
+		else if (thingPressedForMidiLearn == MidiLearn::RECORD_BUTTON) {
 			goto doEndMidiLearnPressSession;
 		}
 	}
@@ -222,7 +226,7 @@ doEndMidiLearnPressSession:
 				if (currentUIMode == UI_MODE_NONE && !Buttons::isShiftButtonPressed()) {
 					currentUIMode = UI_MODE_HOLDING_SAVE_BUTTON;
 					timeSaveButtonPressed = AudioEngine::audioSampleTimer;
-					IndicatorLEDs::setLedState(saveLedX, saveLedY, true);
+					indicator_leds::setLedState(IndicatorLED::SAVE, true);
 				}
 			}
 
@@ -230,7 +234,7 @@ doEndMidiLearnPressSession:
 			else {
 				if (currentUIMode == UI_MODE_HOLDING_SAVE_BUTTON) {
 					if (inCardRoutine) {
-						return ACTION_RESULT_REMIND_ME_OUTSIDE_CARD_ROUTINE;
+						return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 					}
 
 					currentUIMode = UI_MODE_NONE;
@@ -244,7 +248,7 @@ doEndMidiLearnPressSession:
 						}
 					}
 					else {
-						IndicatorLEDs::setLedState(saveLedX, saveLedY, false);
+						indicator_leds::setLedState(IndicatorLED::SAVE, false);
 					}
 				}
 			}
@@ -262,18 +266,18 @@ doEndMidiLearnPressSession:
 
 					if (Buttons::isShiftButtonPressed()) {
 						if (inCardRoutine) {
-							return ACTION_RESULT_REMIND_ME_OUTSIDE_CARD_ROUTINE;
+							return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 						}
-						bool available = contextMenuClearSong.setupAndCheckAvailability();
+						bool available = context_menu::clearSong.setupAndCheckAvailability();
 						if (available) {
-							openUI(&contextMenuClearSong);
+							openUI(&context_menu::clearSong);
 						}
 					}
 
 					else {
 						currentUIMode = UI_MODE_HOLDING_LOAD_BUTTON;
 						timeSaveButtonPressed = AudioEngine::audioSampleTimer;
-						IndicatorLEDs::setLedState(loadLedX, loadLedY, true);
+						indicator_leds::setLedState(IndicatorLED::LOAD, true);
 					}
 				}
 			}
@@ -282,7 +286,7 @@ doEndMidiLearnPressSession:
 			else {
 				if (currentUIMode == UI_MODE_HOLDING_LOAD_BUTTON) {
 					if (inCardRoutine) {
-						return ACTION_RESULT_REMIND_ME_OUTSIDE_CARD_ROUTINE;
+						return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 					}
 					currentUIMode = UI_MODE_NONE;
 
@@ -296,7 +300,7 @@ doEndMidiLearnPressSession:
 						}
 					}
 					else {
-						IndicatorLEDs::setLedState(loadLedX, loadLedY, false);
+						indicator_leds::setLedState(IndicatorLED::LOAD, false);
 					}
 				}
 			}
@@ -310,18 +314,18 @@ doEndMidiLearnPressSession:
 			if (playbackHandler.recording == RECORDING_ARRANGEMENT) {
 cant:
 				numericDriver.displayPopup(HAVE_OLED ? "Recording to arrangement" : "CANT");
-				return ACTION_RESULT_DEALT_WITH;
+				return ActionResult::DEALT_WITH;
 			}
 
 			if (inCardRoutine) {
-				return ACTION_RESULT_REMIND_ME_OUTSIDE_CARD_ROUTINE;
+				return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 			}
 
 			// If no scaling currently, start it, if we're on a Clip-minder screen
 			if (!currentSong->getSyncScalingClip()) {
 				if (!getCurrentUI()->toClipMinder()) {
-					IndicatorLEDs::indicateAlertOnLed(clipViewLedX, clipViewLedY);
-					return ACTION_RESULT_DEALT_WITH;
+					indicator_leds::indicateAlertOnLed(IndicatorLED::CLIP_VIEW);
+					return ActionResult::DEALT_WITH;
 				}
 
 				// Can't do it for arranger-only Clips
@@ -360,9 +364,9 @@ cant:
 				// Here we'll take advantage of the pending command system which has to exist for these commands for their MIDI-triggered case anyway.
 				// In the future, maybe a lot more commands should pend in the same way?
 				pendingGlobalMIDICommand =
-				    Buttons::isShiftButtonPressed() ? GLOBAL_MIDI_COMMAND_REDO : GLOBAL_MIDI_COMMAND_UNDO;
-				pendingGlobalMIDICommandNumClustersWritten = 0; // Bug hunting.
-				playbackHandler.slowRoutine();                  // Do it now if not reading card.
+				    Buttons::isShiftButtonPressed() ? GlobalMIDICommand::REDO : GlobalMIDICommand::UNDO;
+				pendingGlobalMIDICommandNumClustersWritten = GlobalMIDICommand::PLAYBACK_RESTART; // Bug hunting.
+				playbackHandler.slowRoutine(); // Do it now if not reading card.
 			}
 
 			else
@@ -377,7 +381,7 @@ cant:
 #ifdef undoButtonX
 	// Undo button
 	else if (b == undo) {
-		newGlobalMidiCommand = GLOBAL_MIDI_COMMAND_UNDO;
+		newGlobalMidiCommand = GlobalMIDICommand::UNDO;
 possiblyRevert:
 		if (on) {
 			if (actionLogger.allowedToDoReversion()) {
@@ -393,7 +397,7 @@ possiblyRevert:
 
 	// Redo button
 	else if (b == redo) {
-		newGlobalMidiCommand = GLOBAL_MIDI_COMMAND_REDO;
+		newGlobalMidiCommand = GlobalMIDICommand::REDO;
 		goto possiblyRevert;
 	}
 #endif
@@ -404,11 +408,11 @@ possiblyRevert:
 
 			if (playbackHandler.recording == RECORDING_ARRANGEMENT) {
 				numericDriver.displayPopup(HAVE_OLED ? "Recording to arrangement" : "CANT");
-				return ACTION_RESULT_DEALT_WITH;
+				return ActionResult::DEALT_WITH;
 			}
 
 			if (inCardRoutine) {
-				return ACTION_RESULT_REMIND_ME_OUTSIDE_CARD_ROUTINE;
+				return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 			}
 
 			numericDriver.setNextTransitionDirection(1);
@@ -417,10 +421,10 @@ possiblyRevert:
 		}
 	}
 	else {
-		return ACTION_RESULT_NOT_DEALT_WITH;
+		return ActionResult::NOT_DEALT_WITH;
 	}
 
-	return ACTION_RESULT_DEALT_WITH;
+	return ActionResult::DEALT_WITH;
 }
 
 void View::endMIDILearn() {
@@ -436,18 +440,18 @@ void View::endMIDILearn() {
 	}
 	currentUIMode = UI_MODE_NONE;
 	playbackHandler.setLedStates();
-	IndicatorLEDs::setLedState(learnLedX, learnLedY, false);
+	indicator_leds::setLedState(IndicatorLED::LEARN, false);
 }
 
 void View::setTimeBaseScaleLedState() {
 	// If this Clip is the inputTickScaleClip, flash the LED
 	if (getCurrentUI()->toClipMinder() && currentSong->currentClip == currentSong->getSyncScalingClip()) {
-		IndicatorLEDs::blinkLed(syncScalingLedX, syncScalingLedY);
+		indicator_leds::blinkLed(IndicatorLED::SYNC_SCALING);
 	}
 
 	// Otherwise, just light it solidly on or off
 	else {
-		IndicatorLEDs::setLedState(syncScalingLedX, syncScalingLedY, currentSong->getSyncScalingClip() != NULL);
+		indicator_leds::setLedState(IndicatorLED::SYNC_SCALING, currentSong->getSyncScalingClip() != NULL);
 	}
 }
 
@@ -457,49 +461,49 @@ void View::setLedStates() {
 
 void View::sectionMidiLearnPadPressed(bool on, uint8_t section) {
 	if (on) {
-		endMidiLearnPressSession(MIDI_LEARN_SECTION);
+		endMidiLearnPressSession(MidiLearn::SECTION);
 		deleteMidiCommandOnRelease = true;
 		learnedThing = &currentSong->sections[section].launchMIDICommand;
 	}
-	else if (thingPressedForMidiLearn == MIDI_LEARN_SECTION) {
+	else if (thingPressedForMidiLearn == MidiLearn::SECTION) {
 		if (deleteMidiCommandOnRelease) {
 			learnedThing->clear();
 		}
-		endMidiLearnPressSession(0);
+		endMidiLearnPressSession();
 	}
 }
 
 void View::clipStatusMidiLearnPadPressed(bool on, Clip* whichClip) {
 	if (on) {
-		endMidiLearnPressSession(MIDI_LEARN_CLIP);
+		endMidiLearnPressSession(MidiLearn::CLIP);
 		deleteMidiCommandOnRelease = true;
 		learnedThing = &whichClip->muteMIDICommand;
 	}
-	else if (thingPressedForMidiLearn == MIDI_LEARN_CLIP) {
+	else if (thingPressedForMidiLearn == MidiLearn::CLIP) {
 		if (deleteMidiCommandOnRelease) {
 			learnedThing->clear();
 		}
-		endMidiLearnPressSession(0);
+		endMidiLearnPressSession();
 	}
 }
 
 void View::noteRowMuteMidiLearnPadPressed(bool on, NoteRow* whichNoteRow) {
 	if (on) {
-		endMidiLearnPressSession(MIDI_LEARN_NOTEROW_MUTE);
+		endMidiLearnPressSession(MidiLearn::NOTEROW_MUTE);
 		deleteMidiCommandOnRelease = true;
 		learnedThing = &whichNoteRow->drum->muteMIDICommand;
 	}
-	else if (thingPressedForMidiLearn == MIDI_LEARN_NOTEROW_MUTE) {
+	else if (thingPressedForMidiLearn == MidiLearn::NOTEROW_MUTE) {
 		if (deleteMidiCommandOnRelease) {
 			learnedThing->clear();
 		}
-		endMidiLearnPressSession(0);
+		endMidiLearnPressSession();
 	}
 }
 
 void View::drumMidiLearnPadPressed(bool on, Drum* drum, Kit* kit) {
 	if (on) {
-		endMidiLearnPressSession(MIDI_LEARN_DRUM_INPUT);
+		endMidiLearnPressSession(MidiLearn::DRUM_INPUT);
 		deleteMidiCommandOnRelease = true;
 		learnedThing = &drum->midiInput;
 		drumPressedForMIDILearn = drum;
@@ -507,18 +511,18 @@ void View::drumMidiLearnPadPressed(bool on, Drum* drum, Kit* kit) {
 		    kit; // Having this makes it possible to search much faster when we call grabVelocityToLevelFromMIDIDeviceAndSetupPatchingForAllParamManagersForDrum()
 	}
 
-	else if (thingPressedForMidiLearn == MIDI_LEARN_DRUM_INPUT) {
+	else if (thingPressedForMidiLearn == MidiLearn::DRUM_INPUT) {
 		if (deleteMidiCommandOnRelease) {
 			learnedThing->clear();
 			((Instrument*)currentSong->currentClip->output)->beenEdited(false);
 		}
-		endMidiLearnPressSession(0);
+		endMidiLearnPressSession();
 	}
 }
 
 void View::melodicInstrumentMidiLearnPadPressed(bool on, MelodicInstrument* instrument) {
 	if (on) {
-		endMidiLearnPressSession(MIDI_LEARN_MELODIC_INSTRUMENT_INPUT);
+		endMidiLearnPressSession(MidiLearn::MELODIC_INSTRUMENT_INPUT);
 		deleteMidiCommandOnRelease = true;
 		learnedThing = &instrument->midiInput;
 		melodicInstrumentPressedForMIDILearn = instrument;
@@ -526,22 +530,22 @@ void View::melodicInstrumentMidiLearnPadPressed(bool on, MelodicInstrument* inst
 		lowestMIDIChannelSeenWhileLearning = 16;
 	}
 
-	else if (thingPressedForMidiLearn == MIDI_LEARN_MELODIC_INSTRUMENT_INPUT) {
+	else if (thingPressedForMidiLearn == MidiLearn::MELODIC_INSTRUMENT_INPUT) {
 		if (deleteMidiCommandOnRelease) {
 			clearMelodicInstrumentMonoExpressionIfPossible(); // In case it gets "stuck".
 			learnedThing->clear();
 			instrument->beenEdited(false);
 		}
-		endMidiLearnPressSession(0);
+		endMidiLearnPressSession();
 	}
 }
 
-void View::endMidiLearnPressSession(uint8_t newThingPressed) {
+void View::endMidiLearnPressSession(MidiLearn newThingPressed) {
 	// Depending on which thing was previously pressed, we might have to do some admin
 	switch (thingPressedForMidiLearn) {
-	case MIDI_LEARN_PLAY_BUTTON:
-	case MIDI_LEARN_RECORD_BUTTON:
-	case MIDI_LEARN_TAP_TEMPO_BUTTON:
+	case MidiLearn::PLAY_BUTTON:
+	case MidiLearn::RECORD_BUTTON:
+	case MidiLearn::TAP_TEMPO_BUTTON:
 		playbackHandler.setLedStates();
 		break;
 	}
@@ -553,12 +557,12 @@ void View::endMidiLearnPressSession(uint8_t newThingPressed) {
 }
 
 void View::noteOnReceivedForMidiLearn(MIDIDevice* fromDevice, int channelOrZone, int note, int velocity) {
-	if (thingPressedForMidiLearn) {
+	if (thingPressedForMidiLearn != MidiLearn::NONE) {
 		deleteMidiCommandOnRelease = false;
 
 		switch (thingPressedForMidiLearn) {
 
-		case MIDI_LEARN_DRUM_INPUT: {
+		case MidiLearn::DRUM_INPUT: {
 			// For a Drum, we can assume that the user must be viewing a Clip, as the currentClip.
 			((Instrument*)currentSong->currentClip->output)->beenEdited(false);
 
@@ -585,7 +589,7 @@ void View::noteOnReceivedForMidiLearn(MIDIDevice* fromDevice, int channelOrZone,
 				}
 			}
 
-			if (drumPressedForMIDILearn->type == DRUM_TYPE_SOUND) {
+			if (drumPressedForMIDILearn->type == DrumType::SOUND) {
 				currentSong->grabVelocityToLevelFromMIDIDeviceAndSetupPatchingForAllParamManagersForDrum(
 				    fromDevice, (SoundDrum*)drumPressedForMIDILearn, kitPressedForMIDILearn);
 			}
@@ -593,9 +597,9 @@ void View::noteOnReceivedForMidiLearn(MIDIDevice* fromDevice, int channelOrZone,
 			goto recordDetailsOfLearnedThing;
 		}
 
-		case MIDI_LEARN_PLAY_BUTTON:
-		case MIDI_LEARN_RECORD_BUTTON:
-		case MIDI_LEARN_TAP_TEMPO_BUTTON:
+		case MidiLearn::PLAY_BUTTON:
+		case MidiLearn::RECORD_BUTTON:
+		case MidiLearn::TAP_TEMPO_BUTTON:
 			shouldSaveSettingsAfterMidiLearn = true;
 			// No break
 
@@ -606,7 +610,7 @@ recordDetailsOfLearnedThing:
 			learnedThing->noteOrCC = note;
 			break;
 
-		case MIDI_LEARN_MELODIC_INSTRUMENT_INPUT:
+		case MidiLearn::MELODIC_INSTRUMENT_INPUT:
 
 			uint8_t newBendRanges[2];
 
@@ -696,7 +700,7 @@ isMPEZone:
 			learnedThing->device = fromDevice;
 			melodicInstrumentPressedForMIDILearn->beenEdited(false); // Why again?
 
-			if (melodicInstrumentPressedForMIDILearn->type == INSTRUMENT_TYPE_SYNTH) {
+			if (melodicInstrumentPressedForMIDILearn->type == InstrumentType::SYNTH) {
 				currentSong->grabVelocityToLevelFromMIDIDeviceAndSetupPatchingForAllParamManagersForInstrument(
 				    fromDevice, (SoundInstrument*)melodicInstrumentPressedForMIDILearn);
 			}
@@ -730,14 +734,14 @@ void View::clearMelodicInstrumentMonoExpressionIfPossible() {
 }
 
 void View::ccReceivedForMIDILearn(MIDIDevice* fromDevice, int channel, int cc, int value) {
-	if (thingPressedForMidiLearn) {
+	if (thingPressedForMidiLearn != MidiLearn::NONE) {
 		deleteMidiCommandOnRelease = false;
 
 		// For MelodicInstruments...
-		if (thingPressedForMidiLearn == MIDI_LEARN_MELODIC_INSTRUMENT_INPUT) {
+		if (thingPressedForMidiLearn == MidiLearn::MELODIC_INSTRUMENT_INPUT) {
 
 			// Special case for MIDIInstruments - CCs can learn the input MIDI channel
-			if (currentSong->currentClip->output->type == INSTRUMENT_TYPE_MIDI_OUT) {
+			if (currentSong->currentClip->output->type == InstrumentType::MIDI_OUT) {
 
 				// But only if user hasn't already started learning MPE stuff... Or regular note-ons...
 				if (highestMIDIChannelSeenWhileLearning < lowestMIDIChannelSeenWhileLearning) {
@@ -761,29 +765,29 @@ void View::ccReceivedForMIDILearn(MIDIDevice* fromDevice, int channel, int cc, i
 
 void View::midiLearnFlash() {
 	midiLearnFlashOn = !midiLearnFlashOn;
-	uiTimerManager.setTimer(TIMER_MIDI_LEARN_FLASH, fastFlashTime);
+	uiTimerManager.setTimer(TIMER_MIDI_LEARN_FLASH, kFastFlashTime);
 
 	if (getRootUI()) {
 		getRootUI()->midiLearnFlash();
 	}
 
-	if (midiEngine.globalMIDICommands[GLOBAL_MIDI_COMMAND_PLAY].containsSomething()
-	    || thingPressedForMidiLearn == MIDI_LEARN_PLAY_BUTTON) {
-		IndicatorLEDs::setLedState(playLedX, playLedY, midiLearnFlashOn);
+	if (midiEngine.globalMIDICommands[util::to_underlying(GlobalMIDICommand::PLAY)].containsSomething()
+	    || thingPressedForMidiLearn == MidiLearn::PLAY_BUTTON) {
+		indicator_leds::setLedState(IndicatorLED::PLAY, midiLearnFlashOn);
 	}
-	if (midiEngine.globalMIDICommands[GLOBAL_MIDI_COMMAND_RECORD].containsSomething()
-	    || thingPressedForMidiLearn == MIDI_LEARN_RECORD_BUTTON) {
-		IndicatorLEDs::setLedState(recordLedX, recordLedY, midiLearnFlashOn);
+	if (midiEngine.globalMIDICommands[util::to_underlying(GlobalMIDICommand::RECORD)].containsSomething()
+	    || thingPressedForMidiLearn == MidiLearn::RECORD_BUTTON) {
+		indicator_leds::setLedState(IndicatorLED::RECORD, midiLearnFlashOn);
 	}
-	if (midiEngine.globalMIDICommands[GLOBAL_MIDI_COMMAND_TAP].containsSomething()
-	    || thingPressedForMidiLearn == MIDI_LEARN_TAP_TEMPO_BUTTON) {
-		IndicatorLEDs::setLedState(tapTempoLedX, tapTempoLedY, midiLearnFlashOn);
+	if (midiEngine.globalMIDICommands[util::to_underlying(GlobalMIDICommand::TAP)].containsSomething()
+	    || thingPressedForMidiLearn == MidiLearn::TAP_TEMPO_BUTTON) {
+		indicator_leds::setLedState(IndicatorLED::TAP_TEMPO, midiLearnFlashOn);
 	}
 }
 
 void View::modEncoderAction(int whichModEncoder, int offset) {
 
-	if (DELUGE_MODEL != DELUGE_MODEL_40_PAD && Buttons::isShiftButtonPressed()) {
+	if (Buttons::isShiftButtonPressed()) {
 		return;
 	}
 
@@ -826,10 +830,11 @@ void View::modEncoderAction(int whichModEncoder, int offset) {
 
 			// If non-existent param, still let the ModControllable know
 			if (!modelStackWithParam || !modelStackWithParam->autoParam) {
-				int result = activeModControllableModelStack.modControllable->modEncoderActionForNonExistentParam(
-				    offset, whichModEncoder, modelStackWithParam);
+				ActionResult result =
+				    activeModControllableModelStack.modControllable->modEncoderActionForNonExistentParam(
+				        offset, whichModEncoder, modelStackWithParam);
 
-				if (result == ACTION_RESULT_ACTIONED_AND_CAUSED_CHANGE) {
+				if (result == ActionResult::ACTIONED_AND_CAUSED_CHANGE) {
 					setKnobIndicatorLevel(whichModEncoder);
 				}
 			}
@@ -882,13 +887,13 @@ void View::modEncoderAction(int whichModEncoder, int offset) {
 
 				if (!newKnobPos
 				    && modelStackWithParam->paramCollection->shouldParamIndicateMiddleValue(modelStackWithParam)) {
-					IndicatorLEDs::blinkKnobIndicator(whichModEncoder);
+					indicator_leds::blinkKnobIndicator(whichModEncoder);
 
 					// Make it harder to turn that knob away from its centred position
 					Encoders::timeModEncoderLastTurned[whichModEncoder] = AudioEngine::audioSampleTimer - 44100;
 				}
 				else {
-					IndicatorLEDs::stopBlinkingKnobIndicator(whichModEncoder);
+					indicator_leds::stopBlinkingKnobIndicator(whichModEncoder);
 				}
 			}
 		}
@@ -955,14 +960,14 @@ void View::setKnobIndicatorLevels() {
 
 	if (activeModControllableModelStack.modControllable) {
 		for (int whichModEncoder = 0; whichModEncoder < NUM_LEVEL_INDICATORS; whichModEncoder++) {
-			if (!IndicatorLEDs::isKnobIndicatorBlinking(whichModEncoder)) {
+			if (!indicator_leds::isKnobIndicatorBlinking(whichModEncoder)) {
 				setKnobIndicatorLevel(whichModEncoder);
 			}
 		}
 	}
 
 	else {
-		IndicatorLEDs::clearKnobIndicatorLevels();
+		indicator_leds::clearKnobIndicatorLevels();
 	}
 }
 
@@ -991,7 +996,7 @@ void View::setKnobIndicatorLevel(uint8_t whichModEncoder) {
 		    modelStackWithParam->modControllable->getKnobPosForNonExistentParam(whichModEncoder, modelStackWithParam);
 	}
 
-	IndicatorLEDs::setKnobIndicatorLevel(whichModEncoder, knobPos + 64);
+	indicator_leds::setKnobIndicatorLevel(whichModEncoder, knobPos + 64);
 }
 
 static const uint32_t modButtonUIModes[] = {UI_MODE_AUDITIONING,
@@ -1023,9 +1028,6 @@ void View::modButtonAction(uint8_t whichButton, bool on) {
 		else {
 			activeModControllableModelStack.modControllable->modButtonAction(
 			    whichButton, false, (ParamManagerForTimeline*)activeModControllableModelStack.paramManager);
-#if DELUGE_MODEL == DELUGE_MODEL_40_PAD
-			setKnobIndicatorLevels();
-#endif
 		}
 	}
 }
@@ -1039,7 +1041,6 @@ void View::setModLedStates() {
 	bool itsAClip = activeModControllableModelStack.timelineCounterIsSet()
 	                && activeModControllableModelStack.getTimelineCounter() != currentSong;
 
-#if DELUGE_MODEL != DELUGE_MODEL_40_PAD
 	bool affectEntire = getRootUI() && getRootUI()->getAffectEntire();
 	if (!itsTheSong) {
 		if (getRootUI() != &instrumentClipView && getRootUI() != &keyboardScreen) {
@@ -1049,42 +1050,24 @@ void View::setModLedStates() {
 			affectEntire = ((InstrumentClip*)currentSong->currentClip)->affectEntire;
 		}
 	}
-	IndicatorLEDs::setLedState(affectEntireLedX, affectEntireLedY, affectEntire);
+	indicator_leds::setLedState(IndicatorLED::AFFECT_ENTIRE, affectEntire);
 
-	IndicatorLEDs::setLedState(clipViewLedX, clipViewLedY, !itsTheSong);
-#else
-	if (!itsTheSong) {
-		bool shouldBlink = false;
-		if (getRootUI() == &instrumentClipView) {
-			InstrumentClip* clip = (InstrumentClip*)activeModControllableTimelineCounter;
-			shouldBlink = (clip->output->type == INSTRUMENT_TYPE_KIT) ? clip->affectEntire : clip->onKeyboardScreen;
-		}
-
-		if (!shouldBlink)
-			goto noBlinking;
-		IndicatorLEDs::blinkLed(clipViewLedX, clipViewLedY);
-	}
-
-	else {
-noBlinking:
-		IndicatorLEDs::setLedState(clipViewLedX, clipViewLedY, !itsTheSong);
-	}
-#endif
+	indicator_leds::setLedState(IndicatorLED::CLIP_VIEW, !itsTheSong);
 
 	// Sort out the session/arranger view LEDs
 	if (itsTheSong) {
 		if (playbackHandler.recording == RECORDING_ARRANGEMENT) {
-			IndicatorLEDs::blinkLed(sessionViewLedX, sessionViewLedY, 255, 1);
+			indicator_leds::blinkLed(IndicatorLED::SESSION_VIEW, 255, 1);
 		}
 		else if (getRootUI() == &arrangerView) {
-			IndicatorLEDs::blinkLed(sessionViewLedX, sessionViewLedY);
+			indicator_leds::blinkLed(IndicatorLED::SESSION_VIEW);
 		}
 		else {
-			IndicatorLEDs::setLedState(sessionViewLedX, sessionViewLedY, true);
+			indicator_leds::setLedState(IndicatorLED::SESSION_VIEW, true);
 		}
 	}
 	else {
-		IndicatorLEDs::setLedState(sessionViewLedX, sessionViewLedY, false);
+		indicator_leds::setLedState(IndicatorLED::SESSION_VIEW, false);
 	}
 
 	// Sort out actual "mod" LEDs
@@ -1096,9 +1079,9 @@ noBlinking:
 		}
 	}
 
-	for (int i = 0; i < NUM_MOD_BUTTONS; i++) {
+	for (int i = 0; i < kNumModButtons; i++) {
 		bool on = (i == modKnobMode);
-		IndicatorLEDs::setLedState(modLedX[i], modLedY[i], on);
+		indicator_leds::setLedState(indicator_leds::modLed[i], on);
 	}
 }
 
@@ -1222,15 +1205,15 @@ void View::displayOutputName(Output* output, bool doBlink, Clip* clip) {
 
 	int channel, channelSuffix;
 	bool editedByUser = true;
-	if (output->type != OUTPUT_TYPE_AUDIO) {
+	if (output->type != InstrumentType::AUDIO) {
 		Instrument* instrument = (Instrument*)output;
 		editedByUser = !instrument->existsOnCard;
 		switch (output->type) {
-		case INSTRUMENT_TYPE_MIDI_OUT:
+		case InstrumentType::MIDI_OUT:
 			channelSuffix = ((MIDIInstrument*)instrument)->channelSuffix;
 			// No break
 
-		case INSTRUMENT_TYPE_CV:
+		case InstrumentType::CV:
 			channel = ((NonAudioInstrument*)instrument)->channel;
 			break;
 		}
@@ -1240,45 +1223,42 @@ void View::displayOutputName(Output* output, bool doBlink, Clip* clip) {
 }
 
 // If HAVE_OLED, must make sure OLED::sendMainImage() gets called after this.
-void View::drawOutputNameFromDetails(int outputType, int channel, int channelSuffix, char const* name,
+void View::drawOutputNameFromDetails(InstrumentType instrumentType, int channel, int channelSuffix, char const* name,
                                      bool editedByUser, bool doBlink, Clip* clip) {
 	if (doBlink) {
-		int blinkLedX, blinkLedY;
+		using namespace indicator_leds;
+		LED led;
 
-		if (outputType == INSTRUMENT_TYPE_SYNTH) {
-			blinkLedX = synthLedX;
-			blinkLedY = synthLedY;
+		if (instrumentType == InstrumentType::SYNTH) {
+			led = LED::SYNTH;
 		}
 		else {
-			IndicatorLEDs::setLedState(synthLedX, synthLedY, false);
+			setLedState(LED::SYNTH, false);
 		}
 
-		if (outputType == INSTRUMENT_TYPE_KIT) {
-			blinkLedX = kitLedX;
-			blinkLedY = kitLedY;
+		if (instrumentType == InstrumentType::KIT) {
+			led = LED::KIT;
 		}
 		else {
-			IndicatorLEDs::setLedState(kitLedX, kitLedY, false);
+			setLedState(LED::KIT, false);
 		}
 
-		if (outputType == INSTRUMENT_TYPE_MIDI_OUT) {
-			blinkLedX = midiLedX;
-			blinkLedY = midiLedY;
+		if (instrumentType == InstrumentType::MIDI_OUT) {
+			led = LED::MIDI;
 		}
 		else {
-			IndicatorLEDs::setLedState(midiLedX, midiLedY, false);
+			setLedState(LED::MIDI, false);
 		}
 
-		if (outputType == INSTRUMENT_TYPE_CV) {
-			blinkLedX = cvLedX;
-			blinkLedY = cvLedY;
+		if (instrumentType == InstrumentType::CV) {
+			led = LED::CV;
 		}
 		else {
-			IndicatorLEDs::setLedState(cvLedX, cvLedY, false);
+			setLedState(LED::CV, false);
 		}
 
-		if (outputType != OUTPUT_TYPE_AUDIO) {
-			IndicatorLEDs::blinkLed(blinkLedX, blinkLedY);
+		if (instrumentType != InstrumentType::AUDIO) {
+			blinkLed(led);
 		}
 
 		InstrumentClip* clip = NULL;
@@ -1286,31 +1266,28 @@ void View::drawOutputNameFromDetails(int outputType, int channel, int channelSuf
 			clip = (InstrumentClip*)clip;
 		}
 
-#if DELUGE_MODEL != DELUGE_MODEL_40_PAD
-		IndicatorLEDs::setLedState(keyboardLedX, keyboardLedY, (clip && clip->onKeyboardScreen));
-#endif
-		IndicatorLEDs::setLedState(scaleModeLedX, scaleModeLedY,
-		                           (clip && clip->inScaleMode && clip->output->type != INSTRUMENT_TYPE_KIT));
-		IndicatorLEDs::setLedState(crossScreenEditLedX, crossScreenEditLedY, (clip && clip->wrapEditing));
+		setLedState(LED::KEYBOARD, (clip && clip->onKeyboardScreen));
+		setLedState(LED::SCALE_MODE, (clip && clip->inScaleMode && clip->output->type != InstrumentType::KIT));
+		setLedState(LED::CROSS_SCREEN_EDIT, (clip && clip->wrapEditing));
 	}
 
 #if HAVE_OLED
 	OLED::clearMainImage();
 	char const* outputTypeText;
-	switch (outputType) {
-	case INSTRUMENT_TYPE_SYNTH:
+	switch (instrumentType) {
+	case InstrumentType::SYNTH:
 		outputTypeText = "Synth";
 		break;
-	case INSTRUMENT_TYPE_KIT:
+	case InstrumentType::KIT:
 		outputTypeText = "Kit";
 		break;
-	case INSTRUMENT_TYPE_MIDI_OUT:
+	case InstrumentType::MIDI_OUT:
 		outputTypeText = (channel < 16) ? "MIDI channel" : "MPE zone";
 		break;
-	case INSTRUMENT_TYPE_CV:
+	case InstrumentType::CV:
 		outputTypeText = "CV / gate channel";
 		break;
-	case OUTPUT_TYPE_AUDIO:
+	case InstrumentType::AUDIO:
 		outputTypeText = "Audio track";
 		break;
 	default:
@@ -1322,8 +1299,8 @@ void View::drawOutputNameFromDetails(int outputType, int channel, int channelSuf
 #else
 	int yPos = OLED_MAIN_TOPMOST_PIXEL + 3;
 #endif
-	OLED::drawStringCentred(outputTypeText, yPos, OLED::oledMainImage[0], OLED_MAIN_WIDTH_PIXELS, TEXT_SPACING_X,
-	                        TEXT_SPACING_Y);
+	OLED::drawStringCentred(outputTypeText, yPos, OLED::oledMainImage[0], OLED_MAIN_WIDTH_PIXELS, kTextSpacingX,
+	                        kTextSpacingY);
 	char buffer[12];
 	char const* nameToDraw;
 #endif
@@ -1338,8 +1315,8 @@ oledDrawString:
 		int yPos = OLED_MAIN_TOPMOST_PIXEL + 21;
 #endif
 
-		int textSpacingX = TEXT_TITLE_SPACING_X;
-		int textSpacingY = TEXT_TITLE_SIZE_Y;
+		int textSpacingX = kTextTitleSpacingX;
+		int textSpacingY = kTextTitleSizeY;
 
 		int textLength = strlen(name);
 		int stringLengthPixels = textLength * textSpacingX;
@@ -1356,8 +1333,8 @@ oledDrawString:
 
 #else
 		bool andAHalf;
-		if (numericDriver.getEncodedPosFromLeft(99999, name, &andAHalf) > NUMERIC_DISPLAY_LENGTH) { // doBlink &&
-			numericDriver.setScrollingText(name, 0, initialFlashTime + flashTime);
+		if (numericDriver.getEncodedPosFromLeft(99999, name, &andAHalf) > kNumericDisplayLength) { // doBlink &&
+			numericDriver.setScrollingText(name, 0, kInitialFlashTime + kFlashTime);
 		}
 		else {
 			// If numeric-looking, we might want to align right.
@@ -1394,7 +1371,7 @@ yesAlignRight:
 		}
 #endif
 	}
-	else if (outputType == INSTRUMENT_TYPE_MIDI_OUT) {
+	else if (instrumentType == InstrumentType::MIDI_OUT) {
 #if HAVE_OLED
 		if (channel < 16) {
 			slotToString(channel + 1, channelSuffix, buffer, 1);
@@ -1414,7 +1391,7 @@ yesAlignRight:
 		}
 #endif
 	}
-	else if (outputType == INSTRUMENT_TYPE_CV) {
+	else if (instrumentType == InstrumentType::CV) {
 #if HAVE_OLED
 		intToString(channel + 1, buffer);
 oledOutputBuffer:
@@ -1437,10 +1414,10 @@ void View::navigateThroughAudioOutputsForAudioClip(int offset, AudioClip* clip, 
 	actionLogger.deleteAllLogs(); // Can't undo past this!
 
 	// Work out availabilityRequirement. But we don't in this case need to think about whether the Output can be "replaced" - that's for InstrumentClips
-	int availabilityRequirement;
+	Availability availabilityRequirement;
 	currentSong->canOldOutputBeReplaced(clip, &availabilityRequirement);
 
-	if (availabilityRequirement == AVAILABILITY_INSTRUMENT_UNUSED) {
+	if (availabilityRequirement == Availability::INSTRUMENT_UNUSED) {
 		numericDriver.displayPopup(HAVE_OLED ? "Clip has instances in arranger" : "CANT");
 		return;
 	}
@@ -1482,12 +1459,12 @@ void View::navigateThroughPresetsForInstrumentClip(int offset, ModelStackWithTim
 
 	InstrumentClip* clip = (InstrumentClip*)modelStack->getTimelineCounter();
 
-	uint8_t instrumentType = clip->output->type;
+	InstrumentType instrumentType = clip->output->type;
 
 	modelStack->song->ensureAllInstrumentsHaveAClipOrBackedUpParamManager("E057", "H057");
 
 	// Work out availabilityRequirement. This can't change as presets are navigated through... I don't think?
-	int availabilityRequirement;
+	Availability availabilityRequirement;
 	bool oldInstrumentCanBeReplaced = modelStack->song->canOldOutputBeReplaced(clip, &availabilityRequirement);
 
 	bool shouldReplaceWholeInstrument;
@@ -1496,19 +1473,19 @@ void View::navigateThroughPresetsForInstrumentClip(int offset, ModelStackWithTim
 	Instrument* oldInstrument = (Instrument*)clip->output;
 
 	// If we're in MIDI or CV mode, easy - just change the channel
-	if (instrumentType == INSTRUMENT_TYPE_MIDI_OUT || instrumentType == INSTRUMENT_TYPE_CV) {
+	if (instrumentType == InstrumentType::MIDI_OUT || instrumentType == InstrumentType::CV) {
 
 		NonAudioInstrument* oldNonAudioInstrument = (NonAudioInstrument*)oldInstrument;
 		int newChannel = oldNonAudioInstrument->channel;
 		int newChannelSuffix;
-		if (instrumentType == INSTRUMENT_TYPE_MIDI_OUT) {
+		if (instrumentType == InstrumentType::MIDI_OUT) {
 			newChannelSuffix = ((MIDIInstrument*)oldNonAudioInstrument)->channelSuffix;
 		}
 
 		// TODO: the contents of these badly wants to be replaced with how I did it in changeInstrumentType()!
 
 		// CV
-		if (instrumentType == INSTRUMENT_TYPE_CV) {
+		if (instrumentType == InstrumentType::CV) {
 			while (true) {
 				newChannel = (newChannel + offset) & (NUM_CV_CHANNELS - 1);
 
@@ -1517,15 +1494,15 @@ void View::navigateThroughPresetsForInstrumentClip(int offset, ModelStackWithTim
 					return;
 				}
 
-				if (availabilityRequirement == AVAILABILITY_ANY) {
+				if (availabilityRequirement == Availability::ANY) {
 					break;
 				}
-				else if (availabilityRequirement == AVAILABILITY_INSTRUMENT_AVAILABLE_IN_SESSION) {
+				else if (availabilityRequirement == Availability::INSTRUMENT_AVAILABLE_IN_SESSION) {
 					if (!modelStack->song->doesNonAudioSlotHaveActiveClipInSession(instrumentType, newChannel)) {
 						break;
 					}
 				}
-				else if (availabilityRequirement == AVAILABILITY_INSTRUMENT_UNUSED) {
+				else if (availabilityRequirement == Availability::INSTRUMENT_UNUSED) {
 					if (!modelStack->song->getInstrumentFromPresetSlot(instrumentType, newChannel, -1, NULL, NULL,
 					                                                   false)) {
 						break;
@@ -1577,16 +1554,16 @@ void View::navigateThroughPresetsForInstrumentClip(int offset, ModelStackWithTim
 					return;
 				}
 
-				if (availabilityRequirement == AVAILABILITY_ANY) {
+				if (availabilityRequirement == Availability::ANY) {
 					break;
 				}
-				else if (availabilityRequirement == AVAILABILITY_INSTRUMENT_AVAILABLE_IN_SESSION) {
+				else if (availabilityRequirement == Availability::INSTRUMENT_AVAILABLE_IN_SESSION) {
 					if (!modelStack->song->doesNonAudioSlotHaveActiveClipInSession(instrumentType, newChannel,
 					                                                               newChannelSuffix)) {
 						break;
 					}
 				}
-				else if (availabilityRequirement == AVAILABILITY_INSTRUMENT_UNUSED) {
+				else if (availabilityRequirement == Availability::INSTRUMENT_UNUSED) {
 					if (!modelStack->song->getInstrumentFromPresetSlot(instrumentType, newChannel, newChannelSuffix,
 					                                                   NULL, NULL, false)) {
 						break;
@@ -1615,7 +1592,7 @@ void View::navigateThroughPresetsForInstrumentClip(int offset, ModelStackWithTim
 
 			// Because these are just MIDI / CV instruments and we're changing them for all Clips, we can just change the existing Instrument object!
 			oldNonAudioInstrument->channel = newChannel;
-			if (instrumentType == INSTRUMENT_TYPE_MIDI_OUT) {
+			if (instrumentType == InstrumentType::MIDI_OUT) {
 				((MIDIInstrument*)oldNonAudioInstrument)->channelSuffix = newChannelSuffix;
 			}
 
@@ -1629,7 +1606,7 @@ void View::navigateThroughPresetsForInstrumentClip(int offset, ModelStackWithTim
 
 			// If an Instrument doesn't yet exist for the new channel we're gonna use...
 			if (!newInstrument) {
-				if (instrumentType == INSTRUMENT_TYPE_MIDI_OUT) {
+				if (instrumentType == InstrumentType::MIDI_OUT) {
 					newInstrument = modelStack->song->grabHibernatingMIDIInstrument(newChannel, newChannelSuffix);
 					if (newInstrument) {
 						goto gotAnInstrument;
@@ -1643,7 +1620,7 @@ void View::navigateThroughPresetsForInstrumentClip(int offset, ModelStackWithTim
 				}
 
 				// We just allocated a brand new Instrument in RAM. If MIDI, copy knob assignments from old Instrument
-				if (instrumentType == INSTRUMENT_TYPE_MIDI_OUT) {
+				if (instrumentType == InstrumentType::MIDI_OUT) {
 					MIDIInstrument* newMIDIInstrument = (MIDIInstrument*)newInstrument;
 					MIDIInstrument* oldMIDIInstrument = (MIDIInstrument*)clip->output;
 					memcpy(newMIDIInstrument->modKnobCCAssignments, oldMIDIInstrument->modKnobCCAssignments,
@@ -1659,7 +1636,7 @@ void View::navigateThroughPresetsForInstrumentClip(int offset, ModelStackWithTim
 gotAnInstrument:
 
 			int error = clip->changeInstrument(modelStack, newInstrument, NULL,
-			                                   INSTRUMENT_REMOVAL_DELETE_OR_HIBERNATE_IF_UNUSED, NULL, true);
+			                                   InstrumentRemoval::DELETE_OR_HIBERNATE_IF_UNUSED, NULL, true);
 			// TODO: deal with errors
 
 			if (!instrumentAlreadyInSong) {
@@ -1696,10 +1673,10 @@ getOut:
 
 		// For Kits, ensure that every SoundDrum has a ParamManager somewhere
 #if ALPHA_OR_BETA_VERSION
-		if (newInstrument->type == INSTRUMENT_TYPE_KIT) {
+		if (newInstrument->type == InstrumentType::KIT) {
 			Kit* kit = (Kit*)newInstrument;
 			for (Drum* thisDrum = kit->firstDrum; thisDrum; thisDrum = thisDrum->next) {
-				if (thisDrum->type == DRUM_TYPE_SOUND) {
+				if (thisDrum->type == DrumType::SOUND) {
 					SoundDrum* soundDrum = (SoundDrum*)thisDrum;
 					if (!modelStack->song->getBackedUpParamManagerPreferablyWithClip(
 					        soundDrum, NULL)) { // If no backedUpParamManager...
@@ -1741,7 +1718,7 @@ getOut:
 			// If we're here, we know the Clip is not playing in the arranger (and doesn't even have an instance in there)
 
 			int error = clip->changeInstrument(modelStack, newInstrument, NULL,
-			                                   INSTRUMENT_REMOVAL_DELETE_OR_HIBERNATE_IF_UNUSED, NULL, true);
+			                                   InstrumentRemoval::DELETE_OR_HIBERNATE_IF_UNUSED, NULL, true);
 			// TODO: deal with errors!
 
 			if (!instrumentAlreadyInSong) {
@@ -1750,7 +1727,7 @@ getOut:
 		}
 
 		// Kit-specific stuff
-		if (instrumentType == INSTRUMENT_TYPE_KIT) {
+		if (instrumentType == InstrumentType::KIT) {
 			clip->ensureScrollWithinKitBounds();
 			((Kit*)newInstrument)->selectedDrum = NULL;
 		}
@@ -1776,11 +1753,12 @@ getOut:
 }
 
 // Returns whether success
-bool View::changeInstrumentType(int newInstrumentType, ModelStackWithTimelineCounter* modelStack, bool doBlink) {
+bool View::changeInstrumentType(InstrumentType newInstrumentType, ModelStackWithTimelineCounter* modelStack,
+                                bool doBlink) {
 
 	InstrumentClip* clip = (InstrumentClip*)modelStack->getTimelineCounter();
 
-	int oldInstrumentType = clip->output->type;
+	InstrumentType oldInstrumentType = clip->output->type;
 	if (oldInstrumentType == newInstrumentType) {
 		return false;
 	}
@@ -1848,20 +1826,20 @@ void View::getClipMuteSquareColour(Clip* clip, uint8_t thisColour[]) {
 
 	// If user assigning MIDI controls and this Clip has a command assigned, flash pink
 	if (midiLearnFlashOn && clip->muteMIDICommand.containsSomething()) {
-		thisColour[0] = midiCommandColourRed;
-		thisColour[1] = midiCommandColourGreen;
-		thisColour[2] = midiCommandColourBlue;
+		thisColour[0] = midiCommandColour.r;
+		thisColour[1] = midiCommandColour.g;
+		thisColour[2] = midiCommandColour.b;
 		return;
 	}
 
-	if (clipArmFlashOn && clip->armState) {
+	if (clipArmFlashOn && clip->armState != ArmState::OFF) {
 		thisColour[0] = 0;
 		thisColour[1] = 0;
 		thisColour[2] = 0;
 	}
 
 	// If it's soloed or armed to solo, blue
-	else if (clip->soloingInSessionMode || clip->armState == ARM_STATE_ON_TO_SOLO) {
+	else if (clip->soloingInSessionMode || clip->armState == ArmState::ON_TO_SOLO) {
 		menu_item::soloColourMenu.getRGB(thisColour);
 	}
 
@@ -1893,12 +1871,12 @@ void View::getClipMuteSquareColour(Clip* clip, uint8_t thisColour[]) {
 
 extern int8_t defaultAudioClipOverdubOutputCloning;
 
-int View::clipStatusPadAction(Clip* clip, bool on, int yDisplayIfInSessionView) {
+ActionResult View::clipStatusPadAction(Clip* clip, bool on, int yDisplayIfInSessionView) {
 
 	switch (currentUIMode) {
 	case UI_MODE_MIDI_LEARN:
 		if (sdRoutineLock) {
-			return ACTION_RESULT_REMIND_ME_OUTSIDE_CARD_ROUTINE;
+			return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 		}
 		view.clipStatusMidiLearnPadPressed(on, clip);
 		if (!on) {
@@ -1942,7 +1920,7 @@ int View::clipStatusPadAction(Clip* clip, bool on, int yDisplayIfInSessionView) 
 	case UI_MODE_STUTTERING:
 		if (on) {
 			sessionView.performActionOnPadRelease = false; // Even though there's a chance we're not in session view
-			session.toggleClipStatus(clip, NULL, Buttons::isShiftButtonPressed(), INTERNAL_BUTTON_PRESS_LATENCY);
+			session.toggleClipStatus(clip, NULL, Buttons::isShiftButtonPressed(), kInternalButtonPressLatency);
 		}
 		break;
 
@@ -1953,16 +1931,16 @@ int View::clipStatusPadAction(Clip* clip, bool on, int yDisplayIfInSessionView) 
 #endif
 		if (on) {
 			sessionView.performActionOnPadRelease = false; // Even though there's a chance we're not in session view
-			session.soloClipAction(clip, INTERNAL_BUTTON_PRESS_LATENCY);
+			session.soloClipAction(clip, kInternalButtonPressLatency);
 		}
 		break;
 	}
 
-	return ACTION_RESULT_DEALT_WITH;
+	return ActionResult::DEALT_WITH;
 }
 
 void View::flashPlayEnable() {
-	uiTimerManager.setTimer(TIMER_PLAY_ENABLE_FLASH, fastFlashTime);
+	uiTimerManager.setTimer(TIMER_PLAY_ENABLE_FLASH, kFastFlashTime);
 }
 
 void View::flashPlayDisable() {

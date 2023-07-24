@@ -5,6 +5,14 @@ on:
     branches:
       - 'community'
       - 'synthstrom-official'
+    paths:
+      - '.github/workflows/build.yml'
+      - 'src/**'
+      - 'dbt*'
+      - 'toolchain/**'
+      - 'site_scons/**'
+      - 'scripts/**'
+      - 'SConstruct'
   pull_request:
     branches:
       - 'community'
@@ -30,6 +38,7 @@ jobs:
             --user=$(id --user):$(id --group) \
             -v $(pwd):/src \
             ghcr.io/litui/dbt-toolchain:v$(cat toolchain/REQUIRED_VERSION) \
+            build \
             --spew \
             all
 

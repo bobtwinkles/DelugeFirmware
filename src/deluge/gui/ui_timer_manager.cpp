@@ -15,6 +15,7 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "definitions_cxx.hpp"
 #include "processing/engines/audio_engine.h"
 #include "model/clip/instrument_clip_minder.h"
 #include "gui/views/instrument_clip_view.h"
@@ -101,11 +102,11 @@ void UITimerManager::routine() {
 
 				case TIMER_LED_BLINK:
 				case TIMER_LED_BLINK_TYPE_1:
-					IndicatorLEDs::ledBlinkTimeout(i - TIMER_LED_BLINK);
+					indicator_leds::ledBlinkTimeout(i - TIMER_LED_BLINK);
 					break;
 
 				case TIMER_LEVEL_INDICATOR_BLINK:
-					IndicatorLEDs::blinkKnobIndicatorLevelTimeout();
+					indicator_leds::blinkKnobIndicatorLevelTimeout();
 					break;
 
 				case TIMER_SHORTCUT_BLINK:
@@ -117,8 +118,8 @@ void UITimerManager::routine() {
 					break;
 
 				case TIMER_UI_SPECIFIC: {
-					int result = getCurrentUI()->timerCallback();
-					if (result == ACTION_RESULT_REMIND_ME_OUTSIDE_CARD_ROUTINE) {
+					ActionResult result = getCurrentUI()->timerCallback();
+					if (result == ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE) {
 						timers[i].active = true; // Come back soon and try again.
 					}
 					break;
@@ -137,7 +138,7 @@ void UITimerManager::routine() {
 					break;
 
 				case TIMER_GRAPHICS_ROUTINE:
-					if (uartGetTxBufferSpace(UART_ITEM_PIC_PADS) > NUM_BYTES_IN_COL_UPDATE_MESSAGE) {
+					if (uartGetTxBufferSpace(UART_ITEM_PIC_PADS) > kNumBytesInColUpdateMessage) {
 						getCurrentUI()->graphicsRoutine();
 					}
 					setTimer(TIMER_GRAPHICS_ROUTINE, 15);

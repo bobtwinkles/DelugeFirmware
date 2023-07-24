@@ -15,8 +15,7 @@
  * If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef CONSEQUENCECLIPHORIZONTALSHIFT_H_
-#define CONSEQUENCECLIPHORIZONTALSHIFT_H_
+#pragma once
 
 #include "model/consequence/consequence.h"
 #include "RZA1/system/r_typedefs.h"
@@ -24,9 +23,7 @@
 class ConsequenceClipHorizontalShift final : public Consequence {
 public:
 	ConsequenceClipHorizontalShift(int32_t newAmount);
-	int revert(int time, ModelStack* modelStack);
+	int revert(TimeType time, ModelStack* modelStack);
 
 	int32_t amount;
 };
-
-#endif /* CONSEQUENCECLIPHORIZONTALSHIFT_H_ */
