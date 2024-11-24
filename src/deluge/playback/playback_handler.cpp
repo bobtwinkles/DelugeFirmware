@@ -122,14 +122,7 @@ extern "C" uint32_t triggerClockRisingEdgesProcessed;
 
 // This function will be called repeatedly, at all times, to see if it's time to do a tick, and such
 void PlaybackHandler::routine() {
-
-	// Check incoming USB MIDI
-	midiEngine.checkIncomingUsbMidi();
-
-	// Check incoming Serial MIDI
-	for (int32_t i = 0; i < 12 && midiEngine.checkIncomingSerialMidi(); i++) {
-		;
-	}
+	midiEngine.checkIncomingMidi();
 
 	// Check analog clock input
 	if (triggerClockRisingEdgesProcessed != triggerClockRisingEdgesReceived) {
