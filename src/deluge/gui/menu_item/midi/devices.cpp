@@ -25,6 +25,9 @@
 #include "io/midi/cable_types/usb_hosted.h"
 #include "io/midi/midi_device.h"
 #include "io/midi/midi_device_manager.h"
+#include "io/midi/midi_root_complex.h"
+#include "io/midi/root_complex/usb_hosted.h"
+#include "io/midi/root_complex/usb_peripheral.h"
 #include "util/container/static_vector.hpp"
 #include <string_view>
 
@@ -37,7 +40,12 @@ static constexpr int32_t lowestDeviceNum = -3;
 void Devices::beginSession(MenuItem* navigatedBackwardFrom) {
 	bool found = false;
 	if (navigatedBackwardFrom != nullptr) {
-		for (int32_t idx = lowestDeviceNum; idx < MIDIDeviceManager::hostedMIDIDevices.getNumElements(); idx++) {
+		// This will technically do the wrong thing when we're in peripheral mode (it'll set the max index to 2 instead
+		// of 0, which would be accurate) but it should be harmless -- `Devices::getCable` should just return nullptr in
+		// that case which we handle fine already anyway.
+		auto maxIndex =
+		    (MIDIDeviceManager::rootUSB != nullptr) ? MIDIDeviceManager::rootUSB->getNumCables() : lowestDeviceNum + 1;
+		for (int32_t idx = lowestDeviceNum; idx < maxIndex; idx++) {
 			if (getCable(idx) == soundEditor.currentMIDICable) {
 				found = true;
 				this->setValue(idx);
@@ -62,10 +70,12 @@ void Devices::beginSession(MenuItem* navigatedBackwardFrom) {
 void Devices::selectEncoderAction(int32_t offset) {
 	offset = std::clamp<int32_t>(offset, -1, 1);
 
+	auto maxIndex = (MIDIDeviceManager::rootUSB == nullptr) ? 0 : MIDIDeviceManager::rootUSB->getNumCables();
+
 	do {
 		int32_t newValue = this->getValue() + offset;
 
-		if (newValue >= MIDIDeviceManager::hostedMIDIDevices.getNumElements()) {
+		if (newValue >= maxIndex) {
 			if (display->haveOLED()) {
 				return;
 			}
@@ -75,14 +85,14 @@ void Devices::selectEncoderAction(int32_t offset) {
 			if (display->haveOLED()) {
 				return;
 			}
-			newValue = MIDIDeviceManager::hostedMIDIDevices.getNumElements() - 1;
+			newValue = maxIndex - 1;
 		}
 
 		this->setValue(newValue);
 
 		soundEditor.currentMIDICable = getCable(this->getValue());
 
-	} while (!soundEditor.currentMIDICable->connectionFlags);
+	} while (soundEditor.currentMIDICable == nullptr && soundEditor.currentMIDICable->connectionFlags == 0);
 	// Don't show devices which aren't connected. Sometimes we won't even have a name to display for them.
 
 	if (display->haveOLED()) {
@@ -115,24 +125,31 @@ void Devices::selectEncoderAction(int32_t offset) {
 }
 
 MIDICable* Devices::getCable(int32_t deviceIndex) {
-	if (deviceIndex < lowestDeviceNum || deviceIndex >= MIDIDeviceManager::hostedMIDIDevices.getNumElements()) {
+	if (deviceIndex < lowestDeviceNum) {
 		D_PRINTLN("impossible device request");
 		return nullptr;
 	}
-	switch (deviceIndex) {
-	case -3: {
+
+	if (deviceIndex == -3) {
 		return &MIDIDeviceManager::rootDin.cable;
 	}
-	case -2: {
-		return &MIDIDeviceManager::upstreamUSBMIDICable1;
+
+	if (MIDIDeviceManager::rootUSB != nullptr) {
+		auto& rootUSB = *MIDIDeviceManager::rootUSB;
+		if (deviceIndex < 0) {
+			if (rootUSB.getType() == RootComplexType::RC_USB_PERIPHERAL && deviceIndex >= -2) {
+				return rootUSB.getCable(deviceIndex + 2);
+			}
+			return nullptr;
+		}
+
+		if (rootUSB.getType() == RootComplexType::RC_USB_HOST) {
+			auto& usb = static_cast<MIDIRootComplexUSBHosted&>(rootUSB);
+			return usb.getCable(deviceIndex);
+		}
 	}
-	case -1: {
-		return &MIDIDeviceManager::upstreamUSBMIDICable2;
-	}
-	default: {
-		return static_cast<MIDICable*>(MIDIDeviceManager::hostedMIDIDevices.getElement(deviceIndex));
-	}
-	}
+
+	return nullptr;
 }
 
 void Devices::drawValue() {
@@ -154,11 +171,12 @@ void Devices::drawPixelsForOled() {
 
 	int32_t selectedRow = -1;
 
-	int32_t device_idx = currentScroll;
+	auto device_idx = currentScroll;
 	size_t row = 0;
-	while (row < kOLEDMenuNumOptionsVisible && device_idx < MIDIDeviceManager::hostedMIDIDevices.getNumElements()) {
+	auto max_index = (MIDIDeviceManager::rootUSB == nullptr) ? 0 : MIDIDeviceManager::rootUSB->getNumCables();
+	while (row < kOLEDMenuNumOptionsVisible && device_idx < static_cast<ptrdiff_t>(max_index)) {
 		MIDICable* cable = getCable(device_idx);
-		if (cable && cable->connectionFlags != 0u) {
+		if (cable != nullptr && cable->connectionFlags != 0u) {
 			itemNames.push_back(cable->getDisplayName());
 			if (device_idx == this->getValue()) {
 				selectedRow = static_cast<int32_t>(row);
